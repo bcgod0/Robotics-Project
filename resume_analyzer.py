@@ -19,18 +19,63 @@ Run:
 
 # ── 1. Imports & Groq client ─────────────────────────────────────────────────
 import os
+import sys
 import json as _json
 
-# Read API key from environment variable, or prompt via plain input().
-# (getpass is avoided because it breaks in Windows terminals like VS Code / PowerShell)
+# Ensure UTF-8 output on Windows consoles to prevent cp1252 UnicodeEncodeError
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+# Always load from .env first so new keys override stale terminal environment variables
+if os.path.exists(".env"):
+    with open(".env", "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("GROQ_API_KEY="):
+                val = line.split("=", 1)[1].strip().strip('"\'')
+                if val:
+                    os.environ["GROQ_API_KEY"] = val
+            elif line.startswith("GROQ_MODEL="):
+                val = line.split("=", 1)[1].strip().strip('"\'')
+                if val:
+                    os.environ["GROQ_MODEL"] = val
+
 if not os.environ.get("GROQ_API_KEY"):
     os.environ["GROQ_API_KEY"] = input("Enter your Groq API key: ").strip()
+
+_key = os.environ["GROQ_API_KEY"]
+print(f"Loaded Groq API key: {_key[:8]}...{_key[-4:] if len(_key) > 12 else ''}")
 
 from groq import Groq
 
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-MODEL_NAME = "openai/gpt-oss-120b"
+# Model choice — openai/gpt-oss-120b is available and tested on this Groq account.
+MODEL_NAME = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
+# Validate the API key immediately on startup so the user gets instant feedback
+try:
+    client.models.list()
+    print(f"✅ Groq API key verified successfully! Using model: {MODEL_NAME}")
+except Exception as _auth_err:
+    err_msg = str(_auth_err)
+    if "401" in err_msg or "invalid_api_key" in err_msg.lower():
+        print("\n" + "=" * 65)
+        print("❌ [GROQ AUTHENTICATION FAILED - 401 Invalid API Key]")
+        print("=" * 65)
+        print("The Groq API key in your .env file is invalid or was revoked.")
+        print("Steps to resolve:")
+        print("  1. Go to https://console.groq.com/keys")
+        print("  2. Create a new API key (starts with 'gsk_')")
+        print("  3. Paste it into your .env file:")
+        print("       GROQ_API_KEY=gsk_your_new_key_here")
+        print("  4. Save .env and re-run python resume_analyzer.py")
+        print("=" * 65 + "\n")
+        sys.exit(1)
+    else:
+        print(f"⚠️ [Groq Warning]: {_auth_err}")
 
 
 def call_llm(system_prompt: str, user_prompt: str,
@@ -49,9 +94,6 @@ def call_llm(system_prompt: str, user_prompt: str,
         **kwargs,
     )
     return resp.choices[0].message.content
-
-
-print("Groq client ready. Model:", MODEL_NAME)
 
 
 # ── 2. Sample job postings ───────────────────────────────────────────────────
@@ -422,8 +464,25 @@ def run_pipeline_from_pdf(pdf_file):
             "Please ensure it is not a scanned image-only document."
         )
 
-    output = ResumeMatchingAgent(top_k=5).run(text)
-    return generate_report(output)
+    try:
+        output = ResumeMatchingAgent(top_k=5).run(text)
+        return generate_report(output)
+    except Exception as e:
+        err_str = str(e)
+        if "invalid_api_key" in err_str.lower() or "401" in err_str:
+            return (
+                "### ❌ Groq Authentication Error (Invalid API Key)\n\n"
+                "Groq rejected your API key (`401 Invalid API Key`).\n\n"
+                "**How to fix:**\n"
+                "1. Go to [Groq Console API Keys](https://console.groq.com/keys)\n"
+                "2. Click **Create API Key** and copy the new key\n"
+                "3. Open `.env` in this project and paste it:\n"
+                "   ```env\n"
+                "   GROQ_API_KEY=gsk_your_new_key_here\n"
+                "   ```\n"
+                "4. Restart `python resume_analyzer.py`"
+            )
+        return f"### ⚠️ An error occurred during analysis:\n\n`{err_str}`"
 
 
 demo = gr.Interface(
@@ -434,4 +493,5 @@ demo = gr.Interface(
     description="Agentic AI: LLM skill extraction + RAG job retrieval + gap analysis (Groq-powered).",
 )
 
-demo.launch(debug=False, share=True)
+if __name__ == "__main__":
+    demo.launch(debug=False, share=True)
