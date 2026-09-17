@@ -1,0 +1,54 @@
+Upload Resume (PDF),Recommendation Report,timestamp
+,,2026-09-17 20:05:49.591406
+,,2026-09-17 20:05:52.242859
+.gradio\flagged\Upload Resume (PDF)\83d0c29a00e87e90a4fc\Rijul_Resume.pdf,"# 📄 Resume Analysis Report for RIJUL JAIN
+
+**Extracted Skills:** Java, Python, Object-Oriented Programming, Data Structures, Algorithms, Java Collections Framework, MySQL, JDBC, Linux, Git, VSCode, Arduino IDE, Arduino, ESP32, EasyOCR, PyAutoGUI, Linear Algebra, Probability, Statistics, Bayesian Statistics, Optimization, Gradient Descent, Artificial Intelligence, Computer Vision, Voice Recognition, API Integration, Embedded Systems, Robotics, Microcontrollers
+
+## 🎯 Top Job Matches
+
+### 1. Automation Engineer (Python) @ ScriptWorks
+- **Match score:** 75%  (retrieval similarity: 37.2%)
+- **Matching skills:** Python, Git, API Integration
+- **Missing skills:** Automation Scripting
+- **How to close the gap:**
+  - Learn automation scripting with Python using libraries like PyAutoGUI, Selenium, or Robot Framework via online tutorials
+
+### 2. AI/ML Research Assistant @ Cognivance Research
+- **Match score:** 25%  (retrieval similarity: 40.8%)
+- **Matching skills:** Python
+- **Missing skills:** PyTorch, Deep Learning, Research Writing
+- **How to close the gap:**
+  - Complete the free PyTorch fundamentals course on Coursera or the official PyTorch tutorials
+  - Study deep learning concepts via the Deep Learning Specialization on Coursera (Andrew Ng) or fast.ai's Practical Deep Learning for Coders
+  - Learn scientific writing through the Coursera ""Writing in the Sciences"" course or free resources from Purdue OWL
+
+### 3. Computer Vision Intern @ VisionEdge AI
+- **Match score:** 25%  (retrieval similarity: 39.2%)
+- **Matching skills:** Python
+- **Missing skills:** OpenCV, Deep Learning, PyTorch
+- **How to close the gap:**
+  - Complete OpenCV Python tutorials on OpenCV.org or Coursera
+  - Take the Deep Learning Specialization by Andrew Ng on Coursera
+  - Learn PyTorch basics via the official PyTorch tutorials or fast.ai course
+
+### 4. Generative AI Engineer (Junior) @ PromptForge AI
+- **Match score:** 20%  (retrieval similarity: 40.2%)
+- **Matching skills:** Python
+- **Missing skills:** Prompt Engineering, LLMs, RAG, LangChain
+- **How to close the gap:**
+  - Practice prompt design using OpenAI Playground and follow the Prompt Engineering guide by DeepLearning.AI
+  - Take a free Coursera course on Large Language Models or read the Hugging Face tutorials
+  - Learn Retrieval-Augmented Generation via the LangChain docs and a tutorial on building RAG pipelines
+  - Complete LangChain's quickstart tutorial and build a simple LLM app
+
+### 5. RPA Developer (UiPath) - Fresher @ AutomateX
+- **Match score:** 0%  (retrieval similarity: 40.8%)
+- **Matching skills:** None
+- **Missing skills:** UiPath, RPA Concepts, C#, .NET Basics, Process Analysis
+- **How to close the gap:**
+  - Complete UiPath Academy's RPA Developer Foundation training
+  - Study RPA fundamentals via UiPath docs or free tutorials
+  - Learn C# basics through Microsoft Learn or a free online course
+  - Take an introductory .NET course on Coursera or Microsoft Learn
+  - Read process analysis guides and practice mapping workflows",2026-09-17 21:29:22.313956
