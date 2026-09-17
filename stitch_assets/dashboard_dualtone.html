@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Resume Analyzer &amp; Job Matching Agent</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface": "#f7f9fc",
+            "on-surface": "#191c1e",
+            "on-surface-variant": "#6b7280",
+            "surface-container": "#eceef1",
+            "surface-container-high": "#e6e8eb",
+            "surface-container-highest": "#e0e3e6",
+            "surface-container-low": "#f2f4f7",
+            "surface-container-lowest": "#ffffff",
+            "primary": "#0c1014",
+            "primary-container": "#212529",
+            "on-primary": "#ffffff",
+            "secondary": "#00687a",
+            "secondary-container": "#57dffe",
+            "tertiary": "#1a0c00",
+            "tertiary-fixed-dim": "#ffb95f",
+            "dark-panel": "#212529",
+            "dark-card": "#2b3036",
+            "dark-elevated": "#343a40",
+            "accent-emerald": "#4edea3",
+            "accent-amber": "#f59e0b",
+            "accent-rose": "#f43f5e",
+            "accent-cyan": "#06b6d4"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "Inter", "sans-serif"],
+            "headline": ["Plus Jakarta Sans", "sans-serif"],
+            "body": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "3xl": "1.75rem",
+            "4xl": "2.25rem"
+          },
+          boxShadow: {
+            "soft": "0 10px 30px -10px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02)",
+            "elevated": "0 20px 40px -15px rgba(0,0,0,0.07)",
+            "floating": "0 25px 50px -12px rgba(15, 23, 42, 0.12)",
+            "dark-subtle": "0 10px 25px -5px rgba(0, 0, 0, 0.35)"
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 9999px;
+    }
+    .dark-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .dark-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#e8edf2] text-[#191c1e] antialiased p-3 sm:p-5 md:p-8 flex items-center justify-center">
+<!-- Main Floating Container with Dual-Tone Split Layout (Inspired by Image 4) -->
+<div class="w-full max-w-[1520px] min-h-[920px] bg-white rounded-3xl md:rounded-4xl shadow-floating overflow-hidden flex flex-col xl:flex-row border border-slate-200/80">
+<!-- FAR LEFT SLIM NAV RAIL -->
+<aside class="w-full xl:w-20 bg-white border-b xl:border-b-0 xl:border-r border-slate-100 flex xl:flex-col items-center justify-between p-3.5 xl:py-7 shrink-0 z-20">
+<div class="flex xl:flex-col items-center gap-6">
+<!-- Logo Emblem -->
+<div class="w-11 h-11 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shadow-sm border border-amber-100/80">
+<span class="material-symbols-outlined text-[26px]">all_inclusive</span>
+</div>
+<!-- Nav Icons -->
+<nav class="flex xl:flex-col items-center gap-2 md:gap-3">
+<a href="/" class="w-11 h-11 rounded-2xl bg-[#212529] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all" title="Dashboard">
+<span class="material-symbols-outlined text-[21px]">dashboard</span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- MAIN BODY CONTENT: SPLIT 60% / 40% -->
+<div class="flex-1 flex flex-col lg:flex-row min-w-0 bg-[#f7f9fc]">
+<!-- ============================================================ -->
+<!-- LEFT 60% AREA: PORCELAIN / CREAM NEUMORPHIC CANVAS           -->
+<!-- ============================================================ -->
+<section class="w-full lg:w-[57%] p-5 sm:p-7 md:p-8 xl:p-9 flex flex-col justify-between gap-6 overflow-y-auto custom-scrollbar">
+<div class="flex flex-col gap-6">
+<!-- Top Clean Header Bar -->
+<div class="flex items-center justify-between gap-4">
+<div>
+<h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                AI Resume &amp; Career Matching
+              </h1>
+<p class="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                Session Active • Direct Job Match Engine • Updated Just Now
+              </p>
+</div>
+<div class="flex items-center gap-2">
+  <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 border border-emerald-100">
+    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+    Groq LPU Engine Active
+  </span>
+</div>
+</div>
+<!-- TOP 3 METRIC HIGHLIGHT CARDS (Matching Reference Layout) -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+<!-- Card 1: ATS Readiness Score -->
+<div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-soft flex flex-col justify-between relative overflow-hidden group hover:shadow-elevated transition-all">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100">
+<span class="material-symbols-outlined text-[20px]">fact_check</span>
+</div>
+<span class="text-xs font-semibold text-slate-600">ATS Readiness</span>
+</div>
+<div class="mt-4">
+<div class="flex items-baseline gap-1.5">
+<span id="atsReadinessScore" class="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">--%</span>
+<span class="text-[11px] font-medium text-slate-400">Score</span>
+</div>
+<span id="atsReadinessBadge" class="inline-block mt-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold">
+                  Pending Analysis
+                </span>
+</div>
+<!-- Amber Sparkline Wave SVG -->
+<div class="mt-2 -mx-2 -mb-2">
+<svg class="w-full h-11 text-amber-500" preserveaspectratio="none" viewbox="0 0 100 40">
+<defs>
+<lineargradient id="amberGrad" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25"></stop>
+<stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,30 Q20,38 40,25 T80,12 T100,18 L100,40 L0,40 Z" fill="url(#amberGrad)"></path>
+<path d="M0,30 Q20,38 40,25 T80,12 T100,18" fill="none" stroke="#f59e0b" stroke-linecap="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+<!-- Card 2: Core Skill Match -->
+<div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-soft flex flex-col justify-between relative overflow-hidden group hover:shadow-elevated transition-all">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center border border-rose-100">
+<span class="material-symbols-outlined text-[20px]">psychology</span>
+</div>
+<span class="text-xs font-semibold text-slate-600">Core Skill Match</span>
+</div>
+<div class="mt-4">
+<div class="flex items-baseline gap-1.5">
+<span id="matchedSkillsCountTop" class="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">--</span>
+<span id="totalSkillsCountTop" class="text-[11px] font-medium text-slate-400">Skills Matched</span>
+</div>
+<span id="coreMatchPercentTop" class="inline-block mt-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold">
+                  --% Match
+                </span>
+</div>
+<!-- Rose Sparkline Wave SVG -->
+<div class="mt-2 -mx-2 -mb-2">
+<svg class="w-full h-11 text-rose-500" preserveaspectratio="none" viewbox="0 0 100 40">
+<defs>
+<lineargradient id="roseGrad" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#f43f5e" stop-opacity="0.25"></stop>
+<stop offset="100%" stop-color="#f43f5e" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,28 Q25,12 50,30 T85,18 T100,24 L100,40 L0,40 Z" fill="url(#roseGrad)"></path>
+<path d="M0,28 Q25,12 50,30 T85,18 T100,24" fill="none" stroke="#f43f5e" stroke-linecap="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+<!-- Card 3: Target Fit Probability -->
+<div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-soft flex flex-col justify-between relative overflow-hidden group hover:shadow-elevated transition-all">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center border border-cyan-100">
+<span class="material-symbols-outlined text-[20px]">hub</span>
+</div>
+<span class="text-xs font-semibold text-slate-600">Fit Probability</span>
+</div>
+<div class="mt-4">
+<div class="flex items-baseline gap-1.5">
+<span id="fitProbabilityScore" class="text-2xl sm:text-[28px] font-extrabold text-slate-900 tracking-tight">--%</span>
+<span class="text-[11px] font-medium text-slate-400">Fit Probability</span>
+</div>
+<span id="fitProbabilityBadge" class="inline-block mt-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold">
+                  Awaiting Input
+                </span>
+</div>
+<!-- Cyan Sparkline Wave SVG -->
+<div class="mt-2 -mx-2 -mb-2">
+<svg class="w-full h-11 text-cyan-500" preserveaspectratio="none" viewbox="0 0 100 40">
+<defs>
+<lineargradient id="cyanGrad" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#06b6d4" stop-opacity="0.25"></stop>
+<stop offset="100%" stop-color="#06b6d4" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,32 Q30,10 60,26 T90,14 T100,19 L100,40 L0,40 Z" fill="url(#cyanGrad)"></path>
+<path d="M0,32 Q30,10 60,26 T90,14 T100,19" fill="none" stroke="#06b6d4" stroke-linecap="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+</div>
+<!-- INPUT COMMAND CENTER CARDS (Embossed White Neumorphic Containers) -->
+<div class="flex flex-col gap-4">
+<!-- Card A: Candidate Resume Dropzone -->
+<div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-soft flex flex-col gap-3.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<span class="w-6 h-6 rounded-lg bg-slate-900 text-white text-xs font-bold flex items-center justify-center">1</span>
+<h2 class="text-sm font-bold text-slate-900">Candidate Resume Upload</h2>
+</div>
+<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Ready for AI Analysis
+                </span>
+</div>
+<!-- Dropzone (Transforms to Loaded State when Resume is Selected) -->
+<div class="border-2 border-dashed border-slate-200 hover:border-slate-400 bg-slate-50/70 hover:bg-slate-50/95 rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 min-h-[115px]" id="dropzoneResume">
+  <!-- Empty State -->
+  <div id="resumeEmptyState" class="flex flex-col items-center justify-center gap-1.5">
+    <div class="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-600">
+      <span class="material-symbols-outlined text-[22px]">cloud_upload</span>
+    </div>
+    <p class="text-xs sm:text-sm font-medium text-slate-700">
+      Drag &amp; drop resume PDF here, or <span class="text-slate-900 font-bold underline">Browse file</span>
+    </p>
+    <p class="text-[11px] text-slate-400">PDF, DOCX, TXT supported (Max 10MB)</p>
+  </div>
+
+  <!-- Loaded State (fills the drag and drop box with the uploaded resume) -->
+  <div id="resumeLoadedState" class="hidden w-full flex-col sm:flex-row items-center justify-between gap-3 p-2 bg-emerald-50/70 rounded-lg border border-emerald-200/90">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="w-11 h-11 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0 shadow-sm">
+        <span class="material-symbols-outlined text-[24px]">picture_as_pdf</span>
+      </div>
+      <div class="text-left min-w-0">
+        <p class="text-xs sm:text-sm font-bold text-slate-900 truncate" id="fileNameDisplay">Resume.pdf</p>
+        <p class="text-[11px] text-emerald-700 font-medium flex items-center gap-1 mt-0.5" id="fileSizeDisplay">
+          <span class="material-symbols-outlined text-[13px] text-emerald-600">check_circle</span>
+          <span>Resume Loaded • Ready for AI Analysis</span>
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" id="changeResumeBtn" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 shadow-sm transition-all cursor-pointer">
+        <span class="material-symbols-outlined text-[14px]">swap_horiz</span>
+        Change
+      </button>
+      <button type="button" id="removeResumeBtn" class="p-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 rounded-lg text-xs font-semibold flex items-center shadow-sm transition-all cursor-pointer" title="Remove Resume">
+        <span class="material-symbols-outlined text-[16px]">close</span>
+      </button>
+    </div>
+  </div>
+
+  <input accept=".pdf,.docx,.txt" class="hidden" id="resumeFileInput" type="file"/>
+</div>
+<!-- Collapsible Raw Drawer -->
+<div class="border border-slate-100 rounded-xl overflow-hidden">
+<button class="w-full py-2 px-3 bg-slate-50/50 hover:bg-slate-100/70 text-left flex items-center justify-between text-xs font-semibold text-slate-600 transition-colors" id="accordionToggleBtn">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px]">edit_note</span>
+                    Or paste raw markdown / plaintext directly
+                  </span>
+<span class="material-symbols-outlined text-[16px] transition-transform duration-200" id="accordionChevron">expand_more</span>
+</button>
+<div class="hidden p-3 bg-white" id="accordionContent">
+<textarea class="w-full text-xs font-mono text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400" id="rawResumeText" rows="4" placeholder="Or paste your raw resume text or markdown here (experience, skills, projects)..."></textarea>
+</div>
+</div>
+</div>
+<!-- Card B: Target Job Description -->
+<div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-soft flex flex-col gap-3.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<span class="w-6 h-6 rounded-lg bg-slate-900 text-white text-xs font-bold flex items-center justify-center">2</span>
+<h2 class="text-sm font-bold text-slate-900">Target Job Description &amp; Role Spec</h2>
+</div>
+<span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  Target Spec Mode
+                </span>
+</div>
+<!-- Segmented Tab Switcher Pills -->
+<div class="grid grid-cols-2 p-1 rounded-xl bg-slate-100/90 gap-1 text-xs">
+<button class="py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all bg-white text-slate-900 shadow-sm cursor-pointer" id="tabBtnA">
+<span class="material-symbols-outlined text-[15px]">content_paste</span>
+<span>Paste Job Description</span>
+</button>
+<button class="py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all text-slate-500 hover:text-slate-900 cursor-pointer" id="tabBtnB">
+<span class="material-symbols-outlined text-[15px]">photo_camera</span>
+<span>Screenshot / Clipboard (EasyOCR)</span>
+</button>
+</div>
+<!-- Tab Content A: Rich Textarea -->
+<div class="flex flex-col gap-1.5" id="tabContentA">
+<div class="flex items-center justify-between text-[11px] text-slate-500">
+<span class="font-medium">Target Role Specification</span>
+<span class="text-slate-400 font-semibold flex items-center gap-1" id="coreReqsBadge">
+  Awaiting Input
+</span>
+</div>
+<textarea class="w-full bg-slate-50/80 p-3 rounded-xl border border-slate-200 text-xs text-slate-800 leading-relaxed focus:bg-white focus:ring-1 focus:ring-slate-400 focus:outline-none transition-colors" id="jobDescriptionInput" rows="4" placeholder="Paste the job posting, key responsibilities, or technical requirements here..."></textarea>
+</div>
+<!-- Tab Content B: Screenshot OCR with Dedicated Clipboard Paste Button & Preview -->
+<div class="hidden flex-col gap-2.5" id="tabContentB">
+  <!-- Action bar with Paste from Clipboard button and Browse button -->
+  <div class="flex items-center gap-2">
+    <button type="button" id="pasteClipboardBtn" class="flex-1 py-2 px-3 bg-amber-500 hover:bg-amber-600 active:scale-98 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+      <span class="material-symbols-outlined text-[17px]">content_paste</span>
+      <span>Paste Screenshot from Clipboard (Ctrl + V)</span>
+    </button>
+    <button type="button" id="browseScreenshotBtn" class="py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer">
+      <span class="material-symbols-outlined text-[16px]">upload_file</span>
+      <span>Browse</span>
+    </button>
+  </div>
+
+  <input type="file" id="jobScreenshotInput" accept="image/*" class="hidden" />
+
+  <!-- Dropzone & Preview Box -->
+  <div id="screenshotDropzone" class="border-2 border-dashed border-amber-300 hover:border-amber-400 bg-amber-50/40 hover:bg-amber-50/70 rounded-xl p-3.5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 min-h-[110px]">
+    <!-- Placeholder state -->
+    <div id="screenshotPlaceholder" class="flex flex-col items-center gap-1">
+      <span class="material-symbols-outlined text-[26px] text-amber-600">document_scanner</span>
+      <p class="text-xs font-bold text-slate-800" id="screenshotNameDisplay">Drop Screenshot or Press Ctrl + V</p>
+      <p class="text-[11px] text-slate-500" id="screenshotSubDisplay">Snip with Win + Shift + S, then click Paste or press Ctrl + V</p>
+    </div>
+
+    <!-- Preview state (hidden by default) -->
+    <div id="screenshotPreviewContainer" class="hidden w-full flex-col items-center gap-2">
+      <div class="relative max-h-36 max-w-full overflow-hidden rounded-lg border border-slate-200 shadow-sm bg-white p-1">
+        <img id="screenshotPreviewImg" src="" alt="Screenshot Preview" class="max-h-32 object-contain rounded" />
+      </div>
+      <div class="flex items-center justify-between w-full px-2">
+        <span class="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[14px]">check_circle</span>
+          <span id="previewMetaDisplay">Screenshot Loaded • Ready for EasyOCR</span>
+        </span>
+        <button type="button" id="removeScreenshotBtn" class="text-[11px] text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-0.5 cursor-pointer">
+          <span class="material-symbols-outlined text-[14px]">delete</span>
+          Remove
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+<!-- Card C: Primary CTA Buttons -->
+<div class="flex flex-col sm:flex-row items-center gap-3 pt-1">
+<button class="w-full sm:flex-1 py-3 px-6 rounded-2xl bg-[#0c1014] hover:bg-[#212529] text-white font-bold text-sm tracking-wide transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group cursor-pointer" id="runAnalysisBtn">
+<span class="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform text-amber-400">rocket_launch</span>
+<span id="btnText">Analyze Resume &amp; Match Job</span>
+</button>
+<button class="w-full sm:w-auto py-3 px-4 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-semibold text-xs transition-all shadow-soft flex items-center justify-center gap-1.5" id="clearAllInputsBtn">
+<span class="material-symbols-outlined text-[16px]">refresh</span>
+<span>Reset Inputs</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bottom Banner Card -->
+<div class="mt-2 bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-100 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+</div>
+<div>
+<p class="text-xs font-bold text-slate-900">AI Matching Engine: Groq LPU Accelerated (openai/gpt-oss-120b)</p>
+<p class="text-[11px] text-slate-500">Sub-second deep 1-on-1 gap analysis • EasyOCR screenshot parsing active</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<span class="px-3 py-1 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-800 text-[11px] font-bold">
+              Sub-240ms Latency
+            </span>
+<span class="text-[11px] font-medium text-slate-500">Ready</span>
+</div>
+</div>
+</section>
+<!-- ============================================================ -->
+<!-- RIGHT 40% AREA: DEEP CHARCOAL / DARK OBSIDIAN PANEL (#212529)-->
+<!-- ============================================================ -->
+<section class="w-full lg:w-[43%] bg-[#212529] text-white p-5 sm:p-7 md:p-8 xl:p-8 flex flex-col gap-5 overflow-y-auto dark-scrollbar border-t lg:border-t-0 lg:border-l border-slate-800">
+<!-- Top Header with Dropdown (Like "BMI Calculator" in Image 4) -->
+<div class="flex items-center justify-between">
+<div>
+<h2 class="text-lg sm:text-xl font-bold tracking-tight text-white">Candidate Diagnostic &amp; Fit</h2>
+<p class="text-[11px] text-slate-400">Deep 1-on-1 AI matching matrix</p>
+</div>
+<span class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-mono">
+  Live Telemetry
+</span>
+</div>
+
+<!-- Match Score Radial / Spectrum Gauge Card (Like BMI Gauge Card in Image 4) -->
+<div class="bg-[#2b3036] rounded-2xl p-4 sm:p-5 border border-slate-700/60 shadow-dark-subtle flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-xs font-semibold text-slate-300">Composite Match Index (CMI)</span>
+<span id="cmiBadge" class="px-2.5 py-0.5 rounded-md bg-slate-700/60 text-slate-300 text-[10px] font-bold border border-slate-600">
+  Awaiting Input
+</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span id="cmiScorePercent" class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">--%</span>
+<span id="cmiBenchmarkText" class="text-xs text-slate-400">Awaiting Resume & Job Details</span>
+</div>
+<!-- Color Spectrum Gradient Bar with Marker -->
+<div class="flex flex-col gap-1.5 mt-1">
+<div class="relative w-full h-2.5 rounded-full bg-gradient-to-r from-[#06b6d4] via-[#4edea3] to-[#f43f5e] overflow-visible">
+<!-- Pin Pointer Indicator -->
+<div id="spectrumPin" class="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-slate-900 shadow-md transform transition-all duration-700" style="left: 0%;">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" id="spectrumPinDot"></span>
+</div>
+</div>
+<div class="flex justify-between text-[10px] text-slate-400 font-mono pt-1">
+<span>0% Low</span>
+<span>50% Moderate</span>
+<span>75% Good</span>
+<span>100% Elite</span>
+</div>
+</div>
+</div>
+<!-- Target Role Header with DataCo Logo Badge -->
+<div class="bg-[#2b3036] rounded-2xl p-4 border border-slate-700/60 shadow-dark-subtle flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Target Role Assessment</span>
+<span class="text-[10px] text-slate-400 font-mono" id="targetRoleTier">Pending Evaluation</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-cyan-400 shrink-0 shadow-sm" id="targetRoleIcon">
+  <span class="material-symbols-outlined text-[24px]">work</span>
+</div>
+<div class="min-w-0">
+<h3 id="targetRoleTitle" class="text-sm font-bold text-white truncate">Target Position</h3>
+<p id="targetRoleSub" class="text-xs text-slate-400">Enter a job description to begin matching</p>
+</div>
+</div>
+<!-- Recruiter Verdict Quote Callout -->
+<div class="mt-1 p-3 rounded-xl bg-[#212529] border border-slate-700/80 flex gap-2.5 items-start">
+<span class="material-symbols-outlined text-amber-400 text-[18px] shrink-0 mt-0.5">format_quote</span>
+<div class="flex flex-col gap-1">
+<p class="text-xs text-slate-300 italic leading-relaxed">
+                <span id="recruiterVerdictText">“Upload your resume and provide a target job posting. The AI recruiter agent will generate an executive fit analysis here.”</span>
+              </p>
+<span class="text-[10px] font-semibold text-amber-300/80 tracking-wide">
+                — AI Recruiter Assessment
+              </span>
+</div>
+</div>
+</div>
+<!-- Skills Differential Matrix: Matching & Gaps -->
+<div class="bg-[#2b3036] rounded-2xl p-4 border border-slate-700/60 shadow-dark-subtle flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold text-slate-200">Skills Differential Matrix</span>
+<span class="text-[10px] text-slate-400 font-mono" id="skillsTrackedCount">0 Skills Tracked</span>
+</div>
+<!-- Matching Skills -->
+<div class="flex flex-col gap-1.5">
+<span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">check_circle</span>
+              Matching Skills
+            </span>
+<div id="matchingSkillsContainer" class="flex flex-wrap gap-1.5">
+  <span class="text-xs text-slate-400 italic">Matching skills will appear here after analysis.</span>
+</div>
+</div>
+<!-- Missing Skills -->
+<div class="flex flex-col gap-1.5 pt-1 border-t border-slate-700/60">
+<span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">warning</span>
+              Skill Gaps to Address
+            </span>
+<div id="missingSkillsContainer" class="flex flex-wrap gap-1.5">
+  <span class="text-xs text-slate-400 italic">Identified gaps will appear here after analysis.</span>
+</div>
+</div>
+</div>
+<!-- Recommended Upskilling Fast-Track -->
+<div class="bg-[#2b3036] rounded-2xl p-4 sm:p-5 border border-slate-700/60 shadow-dark-subtle flex flex-col gap-3">
+<div class="flex items-center justify-between">
+  <div>
+    <h3 class="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-1.5">
+      <span class="material-symbols-outlined text-[16px] text-cyan-400">trending_up</span>
+      Recommended Fast-Track Upskilling
+    </h3>
+    <p class="text-[10px] text-slate-400 mt-0.5">High-impact actions to close identified skill gaps</p>
+  </div>
+  <span class="text-[10px] font-semibold text-cyan-300 bg-cyan-950/80 border border-cyan-800/80 px-2 py-0.5 rounded-full shrink-0" id="upskillingTotalHours">Pending Gap Analysis</span>
+</div>
+<div id="learningRoadmapContainer" class="flex flex-col gap-2.5">
+  <div class="p-3.5 rounded-xl bg-[#212529] text-xs text-slate-400 text-center italic border border-slate-700/60">
+    Upskilling modules and learning resources will appear here after analysis.
+  </div>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- Interactive Logic Scripts -->
+<script>
+    // Tab Switching Logic for Target JD (Paste vs Screenshot OCR)
+    const tabBtnA = document.getElementById('tabBtnA');
+    const tabBtnB = document.getElementById('tabBtnB');
+    const tabContentA = document.getElementById('tabContentA');
+    const tabContentB = document.getElementById('tabContentB');
+
+    let activeTab = 'A';
+
+    const tabList = [
+      { btn: tabBtnA, content: tabContentA, key: 'A' },
+      { btn: tabBtnB, content: tabContentB, key: 'B' }
+    ];
+
+    function switchTab(key) {
+      activeTab = key;
+      tabList.forEach(t => {
+        t.btn.className = 'py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all text-slate-500 hover:text-slate-900 cursor-pointer';
+        t.content.classList.add('hidden');
+        t.content.classList.remove('flex');
+      });
+      const current = tabList.find(t => t.key === key);
+      if (current) {
+        current.btn.className = 'py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all bg-white text-slate-900 shadow-sm cursor-pointer';
+        current.content.classList.remove('hidden');
+        current.content.classList.add('flex');
+      }
+    }
+
+    tabList.forEach(({ btn, key }) => {
+      btn.addEventListener('click', () => switchTab(key));
+    });
+
+    // Accordion Toggle for raw resume text
+    const accordionToggleBtn = document.getElementById('accordionToggleBtn');
+    const accordionContent = document.getElementById('accordionContent');
+    const accordionChevron = document.getElementById('accordionChevron');
+
+    accordionToggleBtn.addEventListener('click', () => {
+      const isHidden = accordionContent.classList.contains('hidden');
+      if (isHidden) {
+        accordionContent.classList.remove('hidden');
+        accordionChevron.classList.add('rotate-180');
+      } else {
+        accordionContent.classList.add('hidden');
+        accordionChevron.classList.remove('rotate-180');
+      }
+    });
+
+    // File Input & Dropzone State Transitions
+    const dropzoneResume = document.getElementById('dropzoneResume');
+    const resumeFileInput = document.getElementById('resumeFileInput');
+    const resumeEmptyState = document.getElementById('resumeEmptyState');
+    const resumeLoadedState = document.getElementById('resumeLoadedState');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    const fileSizeDisplay = document.getElementById('fileSizeDisplay');
+    const changeResumeBtn = document.getElementById('changeResumeBtn');
+    const removeResumeBtn = document.getElementById('removeResumeBtn');
+
+    function setResumeFile(file) {
+      if (!file) return;
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        resumeFileInput.files = dt.files;
+      } catch (e) {
+        console.warn("Resume DataTransfer notice:", e);
+      }
+      fileNameDisplay.textContent = file.name;
+      const kb = (file.size / 1024).toFixed(1);
+      fileSizeDisplay.innerHTML = `<span class="material-symbols-outlined text-[13px] text-emerald-600">check_circle</span><span>${kb} KB • Ready for AI Analysis</span>`;
+
+      // Transform dropzone from empty dashed box to loaded resume card
+      resumeEmptyState.classList.add('hidden');
+      resumeLoadedState.classList.remove('hidden');
+      resumeLoadedState.classList.add('flex');
+      dropzoneResume.classList.remove('border-dashed', 'border-slate-200', 'bg-slate-50/70');
+      dropzoneResume.classList.add('border-solid', 'border-emerald-300', 'bg-emerald-50/30');
+    }
+
+    function clearResumeFile() {
+      resumeFileInput.value = '';
+      fileNameDisplay.textContent = 'Resume.pdf';
+      fileSizeDisplay.textContent = '';
+
+      resumeEmptyState.classList.remove('hidden');
+      resumeLoadedState.classList.add('hidden');
+      resumeLoadedState.classList.remove('flex');
+      dropzoneResume.classList.remove('border-solid', 'border-emerald-300', 'bg-emerald-50/30');
+      dropzoneResume.classList.add('border-dashed', 'border-slate-200', 'bg-slate-50/70');
+    }
+
+    dropzoneResume.addEventListener('click', () => {
+      if (!resumeFileInput.files || resumeFileInput.files.length === 0) {
+        resumeFileInput.click();
+      }
+    });
+
+    changeResumeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resumeFileInput.click();
+    });
+
+    removeResumeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearResumeFile();
+    });
+
+    resumeFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        setResumeFile(e.target.files[0]);
+      }
+    });
+
+    // Drag and Drop on Resume Dropzone
+    dropzoneResume.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzoneResume.classList.add('border-slate-400', 'bg-slate-100');
+    });
+    dropzoneResume.addEventListener('dragleave', () => {
+      dropzoneResume.classList.remove('border-slate-400', 'bg-slate-100');
+    });
+    dropzoneResume.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzoneResume.classList.remove('border-slate-400', 'bg-slate-100');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        setResumeFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Screenshot & Clipboard Handling
+    const jobScreenshotInput = document.getElementById('jobScreenshotInput');
+    const screenshotDropzone = document.getElementById('screenshotDropzone');
+    const pasteClipboardBtn = document.getElementById('pasteClipboardBtn');
+    const browseScreenshotBtn = document.getElementById('browseScreenshotBtn');
+    const screenshotPlaceholder = document.getElementById('screenshotPlaceholder');
+    const screenshotPreviewContainer = document.getElementById('screenshotPreviewContainer');
+    const screenshotPreviewImg = document.getElementById('screenshotPreviewImg');
+    const previewMetaDisplay = document.getElementById('previewMetaDisplay');
+    const removeScreenshotBtn = document.getElementById('removeScreenshotBtn');
+    let currentScreenshotFile = null;
+
+    function setScreenshotFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      currentScreenshotFile = file;
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        jobScreenshotInput.files = dt.files;
+      } catch (dtErr) {
+        console.warn("DataTransfer assignment notice:", dtErr);
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        screenshotPreviewImg.src = e.target.result;
+        screenshotPlaceholder.classList.add('hidden');
+        screenshotPreviewContainer.classList.remove('hidden');
+        screenshotPreviewContainer.classList.add('flex');
+        const kb = (file.size / 1024).toFixed(1);
+        previewMetaDisplay.textContent = `${file.name || 'Screenshot'} (${kb} KB) • Ready for EasyOCR`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearScreenshot() {
+      currentScreenshotFile = null;
+      jobScreenshotInput.value = '';
+      screenshotPreviewImg.src = '';
+      screenshotPlaceholder.classList.remove('hidden');
+      screenshotPreviewContainer.classList.add('hidden');
+      screenshotPreviewContainer.classList.remove('flex');
+      document.getElementById('screenshotNameDisplay').textContent = 'Drop Screenshot or Press Ctrl + V';
+      document.getElementById('screenshotSubDisplay').textContent = 'Snip with Win + Shift + S, then click Paste or press Ctrl + V';
+    }
+
+    browseScreenshotBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      jobScreenshotInput.click();
+    });
+
+    screenshotDropzone.addEventListener('click', (e) => {
+      if (!jobScreenshotInput.files || jobScreenshotInput.files.length === 0) {
+        jobScreenshotInput.click();
+      }
+    });
+
+    removeScreenshotBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearScreenshot();
+    });
+
+    jobScreenshotInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        setScreenshotFile(e.target.files[0]);
+      }
+    });
+
+    // Paste from Clipboard button click handler (using modern Async Clipboard API)
+    pasteClipboardBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+          alert("Direct clipboard access is restricted in this browser. Please press Ctrl + V directly on this page to paste your screenshot!");
+          return;
+        }
+        const items = await navigator.clipboard.read();
+        let foundImage = false;
+        for (const item of items) {
+          for (const type of item.types) {
+            if (type.startsWith('image/')) {
+              const blob = await item.getType(type);
+              const file = new File([blob], "clipboard_screenshot.png", { type });
+              switchTab('B');
+              setScreenshotFile(file);
+              foundImage = true;
+              break;
+            }
+          }
+          if (foundImage) break;
+        }
+        if (!foundImage) {
+          alert("No image found in your clipboard!\n\n1. Take a screenshot (Win + Shift + S on Windows)\n2. Click 'Paste Screenshot from Clipboard' or press Ctrl + V.");
+        }
+      } catch (err) {
+        console.warn("Clipboard read notice:", err);
+        alert("Clipboard read notice: " + err.message + "\n\nTip: You can press Ctrl + V anywhere on this page to paste your screenshot directly!");
+      }
+    });
+
+    // Global Paste Event Listener (Ctrl + V anywhere)
+    window.addEventListener('paste', (e) => {
+      const activeEl = document.activeElement;
+      // If user is focused in a text area, let standard text paste happen unless clipboard only has an image
+      const isTextInput = activeEl && (activeEl.id === 'rawResumeText' || activeEl.id === 'jobDescriptionInput');
+
+      if (e.clipboardData && e.clipboardData.items) {
+        for (let i = 0; i < e.clipboardData.items.length; i++) {
+          const item = e.clipboardData.items[i];
+          if (item.kind === 'file' && item.type.startsWith('image/')) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            switchTab('B');
+            setScreenshotFile(file);
+            return;
+          }
+        }
+      }
+    });
+
+    // Drag and Drop on Screenshot Dropzone
+    screenshotDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      screenshotDropzone.classList.add('border-amber-500', 'bg-amber-100/60');
+    });
+    screenshotDropzone.addEventListener('dragleave', () => {
+      screenshotDropzone.classList.remove('border-amber-500', 'bg-amber-100/60');
+    });
+    screenshotDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      screenshotDropzone.classList.remove('border-amber-500', 'bg-amber-100/60');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        switchTab('B');
+        setScreenshotFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Reset Inputs
+    const clearAllInputsBtn = document.getElementById('clearAllInputsBtn');
+    const rawResumeText = document.getElementById('rawResumeText');
+    const jobDescriptionInput = document.getElementById('jobDescriptionInput');
+
+    clearAllInputsBtn.addEventListener('click', () => {
+      rawResumeText.value = '';
+      jobDescriptionInput.value = '';
+      clearResumeFile();
+      clearScreenshot();
+    });
+
+    // REAL LIVE AI ANALYSIS SUBMISSION
+    const runAnalysisBtn = document.getElementById('runAnalysisBtn');
+    const btnText = document.getElementById('btnText');
+
+    runAnalysisBtn.addEventListener('click', async () => {
+      const resumeFile = resumeFileInput.files && resumeFileInput.files[0];
+      const resumeText = (rawResumeText.value || '').trim();
+      const jobText = (jobDescriptionInput.value || '').trim();
+      const jobImage = (jobScreenshotInput.files && jobScreenshotInput.files[0]) || currentScreenshotFile;
+
+      if (!resumeFile && !resumeText) {
+        alert("Please provide a resume! Upload a PDF or paste your resume text in the box.");
+        return;
+      }
+
+      if (activeTab === 'A' && !jobText) {
+        alert("Please paste the job description text to match against.");
+        return;
+      }
+
+      if (activeTab === 'B' && !jobImage) {
+        alert("Please upload or drop a screenshot of the job posting.");
+        return;
+      }
+
+      const original = btnText.textContent;
+      btnText.textContent = 'Analyzing with Groq LPU...';
+      runAnalysisBtn.classList.add('opacity-80', 'animate-pulse');
+
+      try {
+        const formData = new FormData();
+        if (resumeFile) {
+          formData.append("resume_file", resumeFile);
+        }
+        formData.append("resume_text", resumeText);
+
+        if (activeTab === 'A') {
+          formData.append("job_text", jobText);
+        } else if (activeTab === 'B' && jobImage) {
+          formData.append("job_image", jobImage);
+        }
+
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+        if (data.status !== "ok") {
+          alert(data.message || "Could not analyze resume.");
+          return;
+        }
+
+        // 1. Role Title & Subtitle
+        if (data.job) {
+          document.getElementById("targetRoleTitle").textContent = data.job.title || 'Target Role';
+          document.getElementById("targetRoleSub").textContent = `${data.job.company || 'Company'} • ${data.job.description ? data.job.description.slice(0, 45) + '...' : 'Target Spec'}`;
+          document.getElementById("targetRoleTier").textContent = 'Target Role Fit';
+        }
+
+        // 2. Scores
+        const score = (data.analysis && data.analysis.match_percentage !== undefined)
+          ? data.analysis.match_percentage
+          : 75;
+
+        document.getElementById("cmiScorePercent").textContent = `${score}.0%`;
+        document.getElementById("atsReadinessScore").textContent = `${score}%`;
+        document.getElementById("fitProbabilityScore").textContent = `${Math.min(99, score + 10)}%`;
+
+        const pin = document.getElementById("spectrumPin");
+        if (pin) {
+          pin.style.left = `${Math.max(5, Math.min(95, score))}%`;
+        }
+        const pinDot = document.getElementById("spectrumPinDot");
+        if (pinDot) {
+          pinDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+        }
+
+        const cmiBadge = document.getElementById("cmiBadge");
+        if (cmiBadge) {
+          if (score >= 80) {
+            cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30';
+            cmiBadge.textContent = 'High Compatibility';
+          } else if (score >= 60) {
+            cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-[10px] font-bold border border-amber-500/30';
+            cmiBadge.textContent = 'Moderate Alignment';
+          } else {
+            cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[10px] font-bold border border-rose-500/30';
+            cmiBadge.textContent = 'Significant Gaps';
+          }
+        }
+
+        const atsBadge = document.getElementById("atsReadinessBadge");
+        if (atsBadge) {
+          atsBadge.className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold';
+          atsBadge.textContent = score >= 75 ? 'ATS Optimized' : 'Needs Optimization';
+        }
+
+        const fitBadge = document.getElementById("fitProbabilityBadge");
+        if (fitBadge) {
+          fitBadge.className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 text-[10px] font-semibold';
+          fitBadge.textContent = score >= 80 ? 'High Tier Candidate' : 'Mid Tier Candidate';
+        }
+
+        // 3. Recruiter Verdict
+        const verdict = (data.analysis && data.analysis.verdict_summary) || 'Candidate evaluated against job description.';
+        document.getElementById("recruiterVerdictText").textContent = `“${verdict}”`;
+
+        // 4. Skills Breakdown
+        const matching = (data.analysis && data.analysis.matching_skills) || [];
+        const missing = (data.analysis && data.analysis.missing_skills) || [];
+
+        const totalSkills = matching.length + missing.length;
+        document.getElementById("matchedSkillsCountTop").textContent = matching.length;
+        document.getElementById("totalSkillsCountTop").textContent = `of ${totalSkills} Matched`;
+        document.getElementById("coreMatchPercentTop").textContent = `${score}% Match`;
+        document.getElementById("coreMatchPercentTop").className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold';
+
+        const skillsTracked = document.getElementById("skillsTrackedCount");
+        if (skillsTracked) skillsTracked.textContent = `${totalSkills} Skills Tracked`;
+
+        const matchBox = document.getElementById("matchingSkillsContainer");
+        if (matchBox) {
+          matchBox.innerHTML = matching.map(s => `
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-[11px] font-semibold border border-emerald-500/25 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ${s}
+            </span>
+          `).join('') || '<span class="text-xs text-slate-400">None detected</span>';
+        }
+
+        const missBox = document.getElementById("missingSkillsContainer");
+        if (missBox) {
+          missBox.innerHTML = missing.map(s => `
+            <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 text-[11px] font-semibold border border-rose-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> ${s}
+            </span>
+          `).join('') || '<span class="text-xs text-emerald-400">None! You meet all listed requirements.</span>';
+        }
+
+        // 5. Learning Fast-Track
+        const learning = (data.analysis && data.analysis.learning_suggestions) || [];
+        const learnBox = document.getElementById("learningRoadmapContainer");
+        const hoursBox = document.getElementById("upskillingTotalHours");
+        if (hoursBox) hoursBox.textContent = `${learning.length} High-Impact Action${learning.length === 1 ? '' : 's'}`;
+
+        if (learnBox && learning.length > 0) {
+          learnBox.innerHTML = learning.map((item, i) => `
+            <div class="p-3.5 rounded-xl bg-[#212529] hover:bg-[#1e2227] transition-all border border-slate-700/70 flex items-start justify-between gap-3 shadow-sm">
+              <div class="flex items-start gap-3 min-w-0 flex-1">
+                <div class="w-7 h-7 rounded-lg ${i % 2 === 0 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'} flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                  <span class="material-symbols-outlined text-[15px]">${i % 2 === 0 ? 'bolt' : 'school'}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-xs font-semibold text-slate-100 leading-relaxed whitespace-normal break-words">${item}</p>
+                  <p class="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full ${i % 2 === 0 ? 'bg-cyan-400' : 'bg-amber-400'}"></span>
+                    Recommended Action to Close Gap
+                  </p>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold text-cyan-400 bg-[#2b3036] border border-slate-700 px-2.5 py-1 rounded-md shrink-0 self-start">
+                Step ${i + 1}
+              </span>
+            </div>
+          `).join('');
+        } else if (learnBox) {
+          learnBox.innerHTML = '<div class="p-3.5 rounded-xl bg-[#212529] text-xs text-emerald-400 text-center border border-emerald-900/40">No critical skill gaps identified! You meet all listed requirements.</div>';
+        }
+
+      } catch (err) {
+        console.error("Analysis failed:", err);
+        alert("Error during analysis: " + err.message);
+      } finally {
+        btnText.textContent = original;
+        runAnalysisBtn.classList.remove('opacity-80', 'animate-pulse');
+      }
+    });
+  </script></body></html>

@@ -1,35 +1,45 @@
 # 📚 Complete Line-by-Line Code Notes & Explanation
 
-Welcome to the beginner-friendly guide for the **AI Resume Analyzer & Job Matching Agent** (`resume_analyzer.py`).
+Welcome to the beginner-friendly guide for the upgraded **AI Resume Analyzer & Job Matching Agent** (`resume_analyzer.py`).
 
-This document breaks down every section, function, and critical line of code into simple, plain English.
+This document breaks down every section, function, and line of code into simple, plain English.
 
 ---
 
 ## 🗺️ High-Level System Architecture
 
-Before diving into the code, here is what the program does from start to finish:
+The application supports **two powerful modes**:
+
+### Mode A: Target Job Mode (1-on-1 Deep Matching)
+When you have a specific job posting from LinkedIn, Indeed, or a company careers page:
 
 ```
-[1. User uploads Resume PDF]
-              │
-              ▼
-[2. pdfplumber extracts raw text]
-              │
-              ▼
-[3. Groq LLM extracts structured profile (Skills, Experience, Education)]
-              │
-              ▼
-[4. SentenceTransformer converts skills into numerical vector embeddings]
-              │
-              ▼
-[5. ChromaDB vector database performs RAG semantic search across 30 jobs]
-              │
-              ▼
-[6. Groq LLM runs Gap Analysis: compares skills, finds missing ones & course tips]
-              │
-              ▼
-[7. Formatted Markdown Report generated & displayed on Gradio Web Interface]
+[Resume: PDF or Pasted Text]        [Job Description: Pasted Text OR Screenshot Image]
+            │                                              │
+            ▼                                              ▼
+[pdfplumber / Text Input]                      [EasyOCR extracts text from image]
+            │                                              │
+            ▼                                              ▼
+[Groq LLM extracts Candidate Profile]          [Groq LLM structures Job Requirements]
+            │                                              │
+            └──────────────────────┬───────────────────────┘
+                                   ▼
+          [Groq LLM 1-on-1 Gap & ATS Tailoring Analysis]
+          - Match Score (0–100%)
+          - Matched Skills vs Missing Skills
+          - Critical ATS Keywords to add
+          - Specific bullet-point tailoring advice
+          - Skill Gap Roadmap & Learning Resources
+                                   │
+                                   ▼
+          [Formatted Markdown Report displayed on Gradio UI]
+```
+
+### Mode B: Database Discovery Mode (Auto-Match Across 30 Curated Roles)
+If you leave the Job Description empty:
+
+```
+[Resume PDF / Text] ➔ [Extract Skills] ➔ [SentenceTransformer Vectors] ➔ [ChromaDB RAG Search] ➔ [Top 5 Matches]
 ```
 
 ---
@@ -45,9 +55,9 @@ import os
 import sys
 import json as _json
 ```
-- `import os`: Gives access to operating system functions, such as reading environment variables and checking if files exist.
-- `import sys`: Used to interact with Python's runtime environment, such as reconfiguring terminal text output and exiting the program on critical errors.
-- `import json as _json`: Used to convert Python dictionaries to JSON strings and parse JSON strings returned by the AI into Python dictionaries.
+- `import os`: Operating system utilities (reading environment variables, checking file paths).
+- `import sys`: System environment control (setting console encodings, exiting cleanly on errors).
+- `import json as _json`: Serializing and deserializing JSON data exchanged with the LLM.
 
 ```python
 if hasattr(sys.stdout, "reconfigure"):
@@ -55,8 +65,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 ```
-- **Why this is here:** Windows terminals default to an old character encoding called `cp1252`. When Python prints emojis like `✅` or `🧠`, Windows crashes with a `UnicodeEncodeError`.
-- `reconfigure(encoding="utf-8", errors="replace")` forces the terminal to accept modern UTF-8 text so emojis print without errors.
+- **Why this is here:** Windows PowerShell defaults to `cp1252` encoding. Printing Unicode emojis like `✅`, `🧠`, or `🎯` crashes with a `UnicodeEncodeError`. Reconfiguring `sys.stdout` to `utf-8` fixes this.
 
 ```python
 if os.path.exists(".env"):
@@ -72,20 +81,7 @@ if os.path.exists(".env"):
                 if val:
                     os.environ["GROQ_MODEL"] = val
 ```
-- **What this does:** Checks if a `.env` file exists in the folder.
-- If it does, it opens and reads it line-by-line.
-- It looks for `GROQ_API_KEY=` and `GROQ_MODEL=`, strips away any extra spaces or quotes, and saves them to `os.environ`.
-- **Why it's written this way:** It loads `.env` **first**, ensuring that any newly pasted key overrides any old or expired key cached in your PowerShell session.
-
-```python
-if not os.environ.get("GROQ_API_KEY"):
-    os.environ["GROQ_API_KEY"] = input("Enter your Groq API key: ").strip()
-
-_key = os.environ["GROQ_API_KEY"]
-print(f"Loaded Groq API key: {_key[:8]}...{_key[-4:] if len(_key) > 12 else ''}")
-```
-- If no key was found in `.env`, it asks you to type or paste it into the console using `input()`.
-- It then prints a masked preview (e.g. `gsk_N5sk...2tp0`) so you know which key is active without exposing the secret.
+- **Why `.env` is loaded first:** If you had an old or invalid key in your PowerShell session (`$env:GROQ_API_KEY`), checking `.env` first guarantees that the newly pasted key takes precedence over the stale terminal session.
 
 ```python
 from groq import Groq
@@ -93,83 +89,34 @@ from groq import Groq
 client = Groq(api_key=os.environ["GROQ_API_KEY"])
 MODEL_NAME = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 ```
-- `from groq import Groq`: Imports the official client library for communicating with Groq's high-speed AI chips (LPU).
-- `client = Groq(...)`: Initializes the client object using your API key.
-- `MODEL_NAME`: Defaults to `"openai/gpt-oss-120b"`, the ultra-fast 120B reasoning model available on your Groq tier.
+- Initializes the Groq client and sets the model to `openai/gpt-oss-120b`, the ultra-fast reasoning model available on your Groq tier.
 
 ```python
 try:
     client.models.list()
     print(f"✅ Groq API key verified successfully! Using model: {MODEL_NAME}")
 except Exception as _auth_err:
-    err_msg = str(_auth_err)
-    if "401" in err_msg or "invalid_api_key" in err_msg.lower():
-        print("\n" + "=" * 65)
-        print("❌ [GROQ AUTHENTICATION FAILED - 401 Invalid API Key]")
-        print("=" * 65)
-        print("The Groq API key in your .env file is invalid or was revoked.")
-        ...
-        sys.exit(1)
+    ...
+    sys.exit(1)
 ```
-- **Instant Health-Check:** Makes a quick test call to Groq (`client.models.list()`) right when the program starts.
-- If the key is invalid or revoked, it halts immediately with clear instructions rather than crashing later in the middle of analyzing a resume.
+- **Instant Validation:** Tests the API key with Groq immediately upon launch. If the key is invalid, it prints a clear banner and exits, saving you from waiting for models to load only to encounter an error later.
 
 ```python
 def call_llm(system_prompt: str, user_prompt: str,
              json_mode: bool = False, temperature: float = 0.2) -> str:
-    """Thin wrapper around the Groq chat completion endpoint."""
-    kwargs = {}
-    if json_mode:
-        kwargs["response_format"] = {"type": "json_object"}
-    resp = client.chat.completions.create(
-        model=MODEL_NAME,
-        temperature=temperature,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        **kwargs,
-    )
-    return resp.choices[0].message.content
 ```
-- This helper function sends a prompt to the Groq LLM:
-  - `system_prompt`: Instructions that define the AI's role and rules (e.g., "You are an expert resume parser").
-  - `user_prompt`: The actual resume text or job details to process.
-  - `json_mode=True`: Forces the LLM to reply strictly with a machine-readable JSON object (no chit-chat or code fences).
-  - `temperature=0.2`: Low temperature ensures factual, reliable, and consistent responses without hallucinating.
+- Standard wrapper for chat completions:
+  - `json_mode=True`: Forces the LLM to return strict, machine-readable JSON.
+  - `temperature=0.2`: Ensures deterministic, factual responses without hallucinations.
 
 ---
 
-### Section 2: Sample Job Postings Database
-
-```python
-SAMPLE_JOBS = [
-    {"title": "Junior Data Analyst", "company": "Northwind Analytics",
-     "required_skills": ["SQL", "Excel", "Python", "Data Visualization", "Statistics"],
-     "description": "Analyze business data, build dashboards, and generate insights..."},
-    ...
-]
-
-with open("sample_jobs.json", "w") as f:
-    _json.dump(SAMPLE_JOBS, f, indent=2)
-```
-- Defines a list of 30 entry-level and internship tech jobs across Data Science, Software Engineering, AI/ML, DevOps, UI/UX, Cloud, and Cybersecurity.
-- Each job contains:
-  - `title`: Job role.
-  - `company`: Company name.
-  - `required_skills`: List of required technologies and competencies.
-  - `description`: Overview of job duties.
-- `_json.dump(...)`: Saves these 30 jobs to a local file (`sample_jobs.json`).
-
----
-
-### Section 3: PDF Resume Parser
+### Section 2: PDF Resume Parser (`parse_resume_pdf`)
 
 ```python
 import pdfplumber
 
 def parse_resume_pdf(file_path: str) -> str:
-    """Extract raw text from a PDF resume."""
     text_parts = []
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
@@ -177,350 +124,130 @@ def parse_resume_pdf(file_path: str) -> str:
             text_parts.append(page_text)
     return "\n".join(text_parts).strip()
 ```
-- `pdfplumber.open(file_path)`: Opens the PDF document file.
-- `for page in pdf.pages`: Loops through every page of the resume.
-- `page.extract_text()`: Reads text lines preserving spacing and layout.
-- `"\n".join(text_parts).strip()`: Combines all pages into a single plain text string.
+- Opens the PDF file with `pdfplumber`, iterates over each page, extracts the text while preserving line spacing, and returns the full resume text.
 
 ---
 
-### Section 4: LLM Skill Extraction & Coercion
+### Section 3: OCR Engine for Screenshots & Images
 
 ```python
-SKILL_EXTRACTION_SYSTEM_PROMPT = """You are an expert resume parser. Extract structured information
-from the resume text the user gives you. Always respond with ONLY a valid JSON object - no markdown,
-no commentary, no code fences. Use this exact schema:
+_ocr_reader = None
 
-{
-  "name": "string",
-  "skills": ["skill1", "skill2", ...],
-  "education": ["degree, institution, year"],
-  "experience": ["short description of each experience/project"],
-  "certifications": ["cert1", ...]
-}
+def get_ocr_reader():
+    global _ocr_reader
+    if _ocr_reader is None:
+        print("🔍 Initializing OCR reader for image text extraction...")
+        import easyocr
+        _ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+    return _ocr_reader
 
-Rules:
-- Normalize skill names (e.g. "ML" -> "Machine Learning").
-- Include skills implied by projects/experience, not just an explicit "Skills:" line.
-- If a field has no data, return an empty list (never null, never omit the key).
-"""
+def extract_text_from_image(image_input) -> str:
+    if image_input is None:
+        return ""
+    try:
+        reader = get_ocr_reader()
+        results = reader.readtext(image_input, detail=0)
+        extracted = "\n".join(results).strip()
+        return extracted
+    except Exception as e:
+        return ""
 ```
-- Tells the LLM to act as a resume parser and specifies the strict JSON structure required.
-- **Normalization Rule:** Normalizes acronyms (e.g. converting `ML` to `Machine Learning`, `AWS` to standard naming) to maximize match accuracy.
+- **Lazy-Loading:** The EasyOCR model is only loaded into memory when the user actually uploads an image. If the user only pastes text or uploads a PDF, OCR overhead is zero!
+- `reader.readtext(image_input, detail=0)`: Scans the screenshot, performs optical character recognition, and returns plain text lines.
 
-```python
-def _coerce_profile(result) -> dict:
-    if isinstance(result, list):
-        return {
-            "name": "",
-            "skills": result,
-            "education": [],
-            "experience": [],
-            "certifications": [],
-        }
-    if not isinstance(result, dict):
-        return {
-            "name": "",
-            "skills": [],
-            "education": [],
-            "experience": [],
-            "certifications": [],
-        }
-    return result
-```
-- **Defensive Type Guard:** LLMs sometimes return a bare JSON list `["Python", "SQL"]` instead of a dictionary `{"skills": ["Python", ...]}`.
-- If left unguarded, `profile.get("skills")` crashes with `AttributeError: 'list' object has no attribute 'get'`.
-- `_coerce_profile` catches this and wraps lists into a dictionary so downstream functions never crash.
+---
 
+### Section 4: AI Skill & Job Description Structuring
+
+#### A. Candidate Skill Extraction
 ```python
 def extract_skills(resume_text: str) -> dict:
-    raw = call_llm(SKILL_EXTRACTION_SYSTEM_PROMPT, resume_text, json_mode=True)
-    try:
-        return _coerce_profile(_json.loads(raw))
-    except _json.JSONDecodeError:
-        fixed = call_llm(
-            "Fix this into strictly valid JSON matching the required schema. Return ONLY JSON.",
-            raw,
-            json_mode=True,
-        )
-        return _coerce_profile(_json.loads(fixed))
 ```
-- Calls Groq with the resume text and the prompt.
-- `_json.loads(raw)`: Parses the AI's string response into a Python dictionary.
-- **Self-Healing Fallback:** If the JSON response is ever slightly corrupted, it automatically sends it back to the LLM asking it to fix the JSON syntax, then parses it again.
+- Sends the resume to Groq with instructions to extract `name`, `skills`, `education`, `experience`, and `certifications`.
+- `_coerce_profile()`: Defensive guard that handles cases where the LLM returns a JSON list instead of an object, preventing `AttributeError`.
+
+#### B. Custom Job Description Parsing
+```python
+def parse_job_description(raw_text: str) -> dict:
+```
+- Takes raw text (from clipboard paste or OCR screenshot output).
+- Prompts the LLM to structure it into:
+  ```json
+  {
+    "title": "Job Title",
+    "company": "Company Name",
+    "required_skills": ["Skill1", "Skill2", ...],
+    "description": "Clear summary of responsibilities"
+  }
+  ```
+- Normalizes acronyms and extracts both explicit requirements and implicit skills.
 
 ---
 
-### Section 5: RAG Vector Search with SentenceTransformers & ChromaDB
+### Section 5: ChromaDB RAG Search (Database Fallback)
 
 ```python
-import chromadb
-from sentence_transformers import SentenceTransformer
-
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
-```
-- `SentenceTransformer("all-MiniLM-L6-v2")`: A lightweight NLP embedding model that maps any sentence or skill list into a 384-dimensional mathematical vector (coordinates).
-- Similar concepts (e.g., "Python Developer" and "Backend Engineer") are placed close together in vector space.
-
-```python
 chroma_client = chromadb.Client()
-try:
-    chroma_client.delete_collection("jobs")
-except Exception:
-    pass
 job_collection = chroma_client.create_collection("jobs")
 ```
-- Initializes **ChromaDB**, an in-memory vector database.
-- Deletes any old collection named `"jobs"` and creates a clean new one.
-
-```python
-job_docs, job_ids, job_metadatas = [], [], []
-for i, job in enumerate(SAMPLE_JOBS):
-    doc_text = f"{job['title']}. Required skills: {', '.join(job['required_skills'])}. {job['description']}"
-    job_docs.append(doc_text)
-    job_ids.append(str(i))
-    job_metadatas.append({
-        "title": job["title"],
-        "company": job["company"],
-        "required_skills": ", ".join(job["required_skills"]),
-        "description": job["description"],
-    })
-
-job_embeddings = embedder.encode(job_docs).tolist()
-
-job_collection.add(
-    ids=job_ids,
-    embeddings=job_embeddings,
-    documents=job_docs,
-    metadatas=job_metadatas,
-)
-```
-- Prepares text representations for all 30 jobs.
-- `embedder.encode(job_docs)`: Converts all 30 job descriptions into vector embeddings.
-- Stores the vectors, document text, and metadata (title, company, required skills) in ChromaDB.
-
-```python
-def search_jobs(profile: dict, top_k: int = 5) -> list:
-    query_text = (
-        f"Skills: {', '.join(profile.get('skills', []))}. "
-        f"Experience: {'; '.join(profile.get('experience', []))}"
-    )
-    query_embedding = embedder.encode([query_text]).tolist()
-    results = job_collection.query(query_embeddings=query_embedding, n_results=top_k)
-
-    matches = []
-    for i in range(len(results["ids"][0])):
-        meta = results["metadatas"][0][i]
-        distance = results["distances"][0][i]
-        similarity = max(0.0, 1 - distance / 2)
-        matches.append({**meta, "similarity": round(similarity * 100, 1)})
-    return matches
-```
-- Converts the candidate's extracted skills and experience into a single search query vector.
-- Queries ChromaDB to find the **`top_k` (default 5)** closest jobs mathematically.
-- Converts vector distance into an intuitive percentage similarity (e.g., `85.4%`).
+- Converts 30 curated entry-level tech jobs into 384-dimensional dense vector embeddings.
+- When no custom job description is provided, `search_jobs(profile, top_k=5)` embeds the candidate's skills and performs cosine similarity search to find the 5 closest roles.
 
 ---
 
-### Section 6: LLM Gap Analysis
+### Section 6: Deep 1-on-1 Target Job Analysis
 
 ```python
-GAP_ANALYSIS_SYSTEM_PROMPT = """You compare a candidate's skills against a job's required skills.
-Respond with ONLY a valid JSON object, no markdown, using this schema:
-
+TARGET_JOB_GAP_PROMPT = """You are an elite technical recruiter and executive career coach.
+Perform an in-depth gap analysis comparing a candidate's resume against a specific target job posting.
+Always respond with ONLY a valid JSON object:
 {
   "match_percentage": 0-100,
-  "matching_skills": ["..."],
-  "missing_skills": ["..."],
-  "learning_suggestions": ["short, concrete suggestion per missing skill"]
+  "matching_skills": [...],
+  "missing_skills": [...],
+  "ats_keywords_to_add": [...],
+  "resume_tailoring_tips": [...],
+  "learning_suggestions": [...],
+  "verdict_summary": "..."
 }
 """
 ```
-- Asks the LLM to compare the candidate with a specific job.
-- Generates:
-  1. `match_percentage`: Overall fit score (0–100%).
-  2. `matching_skills`: Skills the candidate already possesses.
-  3. `missing_skills`: Required skills the candidate lacks.
-  4. `learning_suggestions`: Concrete, actionable steps to learn each missing skill.
-
-```python
-def analyze_gap(profile: dict, job: dict) -> dict:
-    user_prompt = (
-        f"Candidate skills: {profile.get('skills', [])}\n"
-        f"Candidate experience: {profile.get('experience', [])}\n\n"
-        f"Job title: {job['title']}\n"
-        f"Job required skills: {job['required_skills']}\n"
-        f"Job description: {job['description']}"
-    )
-    raw = call_llm(GAP_ANALYSIS_SYSTEM_PROMPT, user_prompt, json_mode=True)
-    try:
-        return _json.loads(raw)
-    except _json.JSONDecodeError:
-        fixed = call_llm(
-            "Fix this into strictly valid JSON matching the schema. Return ONLY JSON.",
-            raw,
-            json_mode=True,
-        )
-        return _json.loads(fixed)
-```
-- Formats the candidate profile and job requirements into a prompt and passes it to `call_llm`.
-- Parses the resulting JSON object with self-healing fallback.
+- Directly evaluates candidate fit for the exact position applied for:
+  - **`ats_keywords_to_add`**: Specific terms from the posting missing in the resume that automated applicant tracking systems look for.
+  - **`resume_tailoring_tips`**: Advice on how to rephrase bullet points to emphasize relevant experience.
+  - **`learning_suggestions`**: High-yield courses/tutorials to bridge skill gaps.
 
 ---
 
-### Section 7: ReAct-style Agent Workflow
+### Section 7: ReAct Agent (`ResumeMatchingAgent`)
 
 ```python
 class ResumeMatchingAgent:
-    def __init__(self, top_k: int = 5, min_skills: int = 2):
-        self.top_k = top_k
-        self.min_skills = min_skills
-        self.trace = []
-
-    def log(self, msg):
-        self.trace.append(msg)
-        print(msg)
+    def run(self, resume_text: str, custom_job: dict = None) -> dict:
 ```
-- Implements an autonomous agent following the **ReAct pattern** (Reason + Act):
-  - Tracks internal execution steps in `self.trace`.
-  - `min_skills`: Guardrail requiring at least 2 detected skills to proceed.
-
-```python
-    def run(self, resume_text: str) -> dict:
-        self.log("🧠 [Agent] Step 1: Extracting skills from resume...")
-        profile = extract_skills(resume_text)
-
-        if len(profile.get("skills", [])) < self.min_skills:
-            self.log("⚠️ [Agent] Too few skills detected. Stopping and requesting clarification.")
-            return {
-                "status": "needs_clarification",
-                "message": (
-                    "Couldn't confidently extract enough skills. Please provide a more "
-                    "detailed resume or list your key skills explicitly."
-                ),
-                "profile": profile,
-            }
-```
-- **Step 1:** Calls `extract_skills`.
-- **Early Exit Guardrail:** If the resume contains fewer than 2 recognizable skills (e.g. blank page or poorly formatted file), it stops early and informs the user rather than running useless searches.
-
-```python
-        self.log("🧠 [Agent] Step 2: Retrieving candidate jobs via RAG...")
-        matches = search_jobs(profile, top_k=self.top_k)
-
-        if not matches:
-            self.log("⚠️ [Agent] No jobs found...")
-            return {"status": "no_matches", "profile": profile}
-
-        self.log("🧠 [Agent] Step 3: Running gap analysis for each match...")
-        results = []
-        for m in matches:
-            job_lookup = {
-                "title": m["title"],
-                "required_skills": m["required_skills"].split(", "),
-                "description": m["description"],
-            }
-            gap = analyze_gap(profile, job_lookup)
-            results.append({**m, **gap})
-
-        results.sort(key=lambda r: r.get("match_percentage", 0), reverse=True)
-        self.log("✅ [Agent] Gap analysis complete. Compiling final report.")
-
-        return {"status": "ok", "profile": profile, "results": results}
-```
-- **Step 2:** Uses semantic vector search to find candidate jobs from ChromaDB.
-- **Step 3:** For each retrieved job, it runs a deep gap analysis via the LLM.
-- Sorts the final matches from highest match percentage to lowest.
+- Step 1: Extracts structured skills from the resume.
+- Early exit check: If fewer than 2 skills are detected, stops early and asks for more details.
+- **Branching Decision:**
+  - If `custom_job` is provided: Runs deep 1-on-1 target analysis.
+  - If `custom_job` is None: Runs RAG retrieval across ChromaDB and evaluates the top 5 matches.
 
 ---
 
-### Section 8: Markdown Report Generator
+### Section 8: Report Generator & Gradio UI
 
-```python
-def generate_report(agent_output: dict) -> str:
-    if agent_output["status"] != "ok":
-        return f"⚠️ {agent_output.get('message', 'Could not generate a report.')}"
-
-    profile = agent_output["profile"]
-    lines = []
-    lines.append(f"# Resume Analysis Report for {profile.get('name', 'Candidate')}\n")
-    lines.append(f"**Extracted Skills:** {', '.join(profile.get('skills', []))}\n")
-    lines.append("## Top Job Matches\n")
-
-    for i, r in enumerate(agent_output["results"], 1):
-        lines.append(f"### {i}. {r['title']} @ {r['company']}")
-        lines.append(f"- **Match score:** {r.get('match_percentage', 'N/A')}%  (retrieval similarity: {r['similarity']}%)")
-        lines.append(f"- **Matching skills:** {', '.join(r.get('matching_skills', [])) or 'None'}")
-        lines.append(f"- **Missing skills:** {', '.join(r.get('missing_skills', [])) or 'None'}")
-        if r.get("learning_suggestions"):
-            lines.append("- **How to close the gap:**")
-            for s in r["learning_suggestions"]:
-                lines.append(f"  - {s}")
-        lines.append("")
-
-    return "\n".join(lines)
-```
-- Converts the raw dictionary results from the agent into a readable, formatted Markdown document with headings, bullet points, match percentages, and learning recommendations.
+- `generate_report()`: Formats results into clean Markdown with badges, tables, and bullet points.
+- `run_pipeline()`: Unified entry point supporting PDF upload, pasted resume text, pasted job description, and screenshot image.
+- `gr.Blocks()`: Modern tabbed UI with drag-and-drop file uploaders, screenshot dropzone, and responsive layout.
 
 ---
 
-### Section 9: Gradio Web Interface
+## 💡 Summary of New Capabilities
 
-```python
-import gradio as gr
-
-def run_pipeline_from_pdf(pdf_file):
-    if pdf_file is None:
-        return "Please upload a resume PDF."
-
-    # Gradio version compatibility check
-    file_path = pdf_file if isinstance(pdf_file, str) else pdf_file.name
-
-    text = parse_resume_pdf(file_path)
-
-    if not text.strip():
-        return (
-            "Could not extract any text from the uploaded PDF. "
-            "Please ensure it is not a scanned image-only document."
-        )
-
-    try:
-        output = ResumeMatchingAgent(top_k=5).run(text)
-        return generate_report(output)
-    except Exception as e:
-        ...
-```
-- `run_pipeline_from_pdf`: Callback function executed when the user clicks **Submit** in the web interface.
-- Handles differences between Gradio versions (Gradio 4 passes file path as `str`, Gradio 3 as an object with `.name`).
-- Guards against image-only/scanned PDFs that contain no extractable text.
-- Wraps execution in `try-except` to present clean error messages in the UI.
-
-```python
-demo = gr.Interface(
-    fn=run_pipeline_from_pdf,
-    inputs=gr.File(label="Upload Resume (PDF)", file_types=[".pdf"]),
-    outputs=gr.Markdown(label="Recommendation Report"),
-    title="AI Resume Analyzer & Job Matching Agent",
-    description="Agentic AI: LLM skill extraction + RAG job retrieval + gap analysis (Groq-powered).",
-)
-
-if __name__ == "__main__":
-    demo.launch(debug=False, share=True)
-```
-- Builds an interactive web application:
-  - Input: File upload box accepting `.pdf` files.
-  - Output: Formatted Markdown text area.
-- `share=True`: Generates both a local URL (`http://127.0.0.1:7860`) and a temporary public link (`https://xxxx.gradio.live`) so anyone can try your app from their phone or browser.
-
----
-
-## 💡 Key Machine Learning Concepts Explained
-
-| Concept | What It Means in Simple Terms | Where It Is Used in Code |
-| :--- | :--- | :--- |
-| **LLM (Large Language Model)** | An advanced neural network trained on massive text to reason, extract information, and write content. | Groq (`openai/gpt-oss-120b`) in `call_llm()` |
-| **Vector Embedding** | Turning words and sentences into a list of numbers (coordinates) so computers can calculate mathematical similarity between meanings. | `SentenceTransformer("all-MiniLM-L6-v2")` |
-| **RAG (Retrieval-Augmented Generation)** | First retrieving relevant records from a vector database (ChromaDB), then passing them to the LLM to reason over. | `search_jobs()` + `analyze_gap()` |
-| **Agentic Workflow / ReAct** | An AI that doesn't just answer once, but takes a step-by-step loop: Reason ➔ Use Tool ➔ Validate Result ➔ Plan next step. | `ResumeMatchingAgent` class |
-| **JSON Mode** | Enforcing strict JSON syntax on LLM outputs so programs can parse results without regex or text scraping errors. | `json_mode=True` parameter |
-| **Cosine Distance / Similarity** | The angular distance between two vectors. A distance of `0` means identical concepts; `2` means opposites. | `similarity = max(0.0, 1 - distance / 2)` in `search_jobs()` |
+| Feature | How It Works |
+|---|---|
+| **Pasted Job Description** | Paste text from LinkedIn / Indeed ➔ Parsed into structured requirements ➔ Analyzed 1-on-1 |
+| **Screenshot Job Description** | Upload image ➔ EasyOCR reads text ➔ LLM cleans and structures it ➔ Analyzed 1-on-1 |
+| **Resume Text Paste** | Don't have a PDF? Paste raw resume text directly into the text box |
+| **ATS Tailoring Advice** | Pinpoints exact missing keywords to beat Applicant Tracking Systems |
+| **Database Auto-Match** | Leave the job description blank to automatically find matches across 30 curated jobs |

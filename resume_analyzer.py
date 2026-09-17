@@ -1,23 +1,19 @@
 """
-AI Resume Analyzer & Job Matching Agent
-========================================
-Standalone Python script converted from the Jupyter notebook.
-
-Fixes applied vs. the original notebook:
-  1. extract_skills() – added _coerce_profile() guard so that when the LLM
-     returns a JSON array (instead of a dict) the pipeline no longer crashes
-     with  AttributeError: 'list' object has no attribute 'get'.
-  2. run_pipeline_from_pdf() – fixed Gradio file-object handling to support
-     both Gradio <= 3.x (NamedString with .name) and Gradio >= 4.x (plain str
-     path), preventing AttributeError: 'str' object has no attribute 'name'.
-  3. run_pipeline_from_pdf() – added a guard for empty/image-only PDFs so the
-     user gets a clear warning instead of a silent crash.
+AI Resume Analyzer & Job Matching Agent (Direct 1-on-1 Matching)
+================================================================
+Supports:
+  1. Resume input via PDF file upload or direct text paste.
+  2. Target Job Description input via:
+     - 📋 Pasted Job Description text (LinkedIn, Indeed, etc.)
+     - 🖼️ Job Description Screenshot / Image (PNG, JPG, etc.) with EasyOCR
+  3. Deep 1-on-1 gap analysis with match scores, ATS keywords, resume tailoring tips,
+     and targeted learning roadmaps.
 
 Run:
     python resume_analyzer.py
 """
 
-# ── 1. Imports & Groq client ─────────────────────────────────────────────────
+# ── 1. Imports & Environment Setup ───────────────────────────────────────────
 import os
 import sys
 import json as _json
@@ -96,107 +92,7 @@ def call_llm(system_prompt: str, user_prompt: str,
     return resp.choices[0].message.content
 
 
-# ── 2. Sample job postings ───────────────────────────────────────────────────
-SAMPLE_JOBS = [
-    {"title": "Junior Data Analyst", "company": "Northwind Analytics",
-     "required_skills": ["SQL", "Excel", "Python", "Data Visualization", "Statistics"],
-     "description": "Analyze business data, build dashboards, and generate insights for stakeholders. Entry-level role, training provided on internal tools."},
-    {"title": "Machine Learning Intern", "company": "Vertex AI Labs",
-     "required_skills": ["Python", "Machine Learning", "NumPy", "Pandas", "Scikit-learn"],
-     "description": "Assist the ML team in building and evaluating models for recommendation systems. Exposure to production ML pipelines."},
-    {"title": "Frontend Developer (Junior)", "company": "PixelForge",
-     "required_skills": ["JavaScript", "React", "HTML", "CSS", "Git"],
-     "description": "Build responsive UI components for a SaaS product. Work closely with designers and backend engineers."},
-    {"title": "Backend Developer (Entry Level)", "company": "CoreStack Systems",
-     "required_skills": ["Python", "REST APIs", "SQL", "Django", "Git"],
-     "description": "Develop and maintain backend services and APIs for a growing fintech platform."},
-    {"title": "Business Intelligence Trainee", "company": "Insight Metrics",
-     "required_skills": ["SQL", "Power BI", "Excel", "Data Modeling"],
-     "description": "Support the BI team in building reports and dashboards for leadership decision-making."},
-    {"title": "AI/ML Research Assistant", "company": "Cognivance Research",
-     "required_skills": ["Python", "PyTorch", "Deep Learning", "Research Writing"],
-     "description": "Support ongoing NLP research projects, run experiments, and help prepare publications."},
-    {"title": "Cloud Support Engineer (Junior)", "company": "SkyNet Cloud Services",
-     "required_skills": ["AWS", "Linux", "Networking Basics", "Python", "Troubleshooting"],
-     "description": "Provide first-line support for cloud infrastructure customers and escalate complex issues."},
-    {"title": "QA/Automation Tester", "company": "Bright Software Co",
-     "required_skills": ["Selenium", "Python", "Test Case Design", "Git", "Agile"],
-     "description": "Write and execute automated test scripts to ensure product quality before releases."},
-    {"title": "RPA Developer (UiPath) - Fresher", "company": "AutomateX",
-     "required_skills": ["UiPath", "RPA Concepts", "C#", ".NET Basics", "Process Analysis"],
-     "description": "Design, build, and maintain RPA bots using UiPath to automate business workflows."},
-    {"title": "Data Engineering Intern", "company": "PipelineWorks",
-     "required_skills": ["Python", "SQL", "ETL", "Airflow", "Cloud Basics"],
-     "description": "Help build and maintain data pipelines feeding analytics and ML systems."},
-    {"title": "NLP Engineer (Junior)", "company": "LexiSpeak AI",
-     "required_skills": ["Python", "NLP", "Transformers", "Hugging Face", "Prompt Engineering"],
-     "description": "Build and fine-tune NLP models for a conversational AI product."},
-    {"title": "Full Stack Developer (Entry Level)", "company": "AppNova",
-     "required_skills": ["JavaScript", "Node.js", "React", "MongoDB", "REST APIs"],
-     "description": "Work across the stack to ship features for a fast-growing consumer app."},
-    {"title": "DevOps Intern", "company": "InfraLoop",
-     "required_skills": ["Docker", "CI/CD", "Linux", "Git", "Cloud Basics"],
-     "description": "Support deployment pipelines and infrastructure automation for engineering teams."},
-    {"title": "Product Analyst Intern", "company": "Metricly",
-     "required_skills": ["SQL", "Excel", "A/B Testing", "Data Visualization"],
-     "description": "Analyze product usage data to support feature prioritization decisions."},
-    {"title": "Cybersecurity Analyst Trainee", "company": "SentinelGuard",
-     "required_skills": ["Networking", "Linux", "Security Fundamentals", "Python"],
-     "description": "Monitor systems for security threats and assist in incident response under supervision."},
-    {"title": "Mobile App Developer (Android) - Junior", "company": "AppSprout",
-     "required_skills": ["Kotlin", "Android SDK", "Git", "REST APIs"],
-     "description": "Develop and maintain features for a consumer Android application."},
-    {"title": "Computer Vision Intern", "company": "VisionEdge AI",
-     "required_skills": ["Python", "OpenCV", "Deep Learning", "PyTorch"],
-     "description": "Work on object detection and image classification models for retail analytics."},
-    {"title": "Technical Support Engineer", "company": "HelpDesk Pro",
-     "required_skills": ["Troubleshooting", "SQL Basics", "Communication", "Linux Basics"],
-     "description": "Resolve customer-reported technical issues and escalate as needed."},
-    {"title": "Automation Engineer (Python)", "company": "ScriptWorks",
-     "required_skills": ["Python", "Automation Scripting", "APIs", "Git"],
-     "description": "Build internal automation tools to streamline repetitive business processes."},
-    {"title": "Data Science Intern", "company": "Quantify Labs",
-     "required_skills": ["Python", "Pandas", "Machine Learning", "Statistics", "Data Visualization"],
-     "description": "Work on real datasets to build predictive models and present findings to stakeholders."},
-    {"title": "UI/UX Designer (Junior)", "company": "DesignHive",
-     "required_skills": ["Figma", "Wireframing", "User Research", "Prototyping"],
-     "description": "Design intuitive interfaces for web and mobile products in collaboration with developers."},
-    {"title": "IT Support Analyst", "company": "GlobalTech Services",
-     "required_skills": ["Windows Admin", "Networking Basics", "Troubleshooting", "Ticketing Systems"],
-     "description": "Provide day-to-day IT support to internal employees across departments."},
-    {"title": "Generative AI Engineer (Junior)", "company": "PromptForge AI",
-     "required_skills": ["Python", "Prompt Engineering", "LLMs", "RAG", "LangChain"],
-     "description": "Build LLM-powered applications and agentic workflows for enterprise clients."},
-    {"title": "Database Administrator Trainee", "company": "DataVault Inc",
-     "required_skills": ["SQL", "Database Design", "Backup & Recovery", "Linux Basics"],
-     "description": "Assist senior DBAs in maintaining and optimizing production databases."},
-    {"title": "Software Test Engineer", "company": "QualityFirst Labs",
-     "required_skills": ["Manual Testing", "Selenium", "Java", "Bug Tracking"],
-     "description": "Ensure software quality through manual and automated testing cycles."},
-    {"title": "Data Annotation Specialist", "company": "LabelWorks AI",
-     "required_skills": ["Attention to Detail", "Basic Python", "Data Labeling Tools"],
-     "description": "Prepare and label datasets used to train machine learning models."},
-    {"title": "Blockchain Developer Intern", "company": "ChainForge",
-     "required_skills": ["Solidity", "JavaScript", "Web3.js", "Smart Contracts"],
-     "description": "Assist in building and testing smart contracts for decentralized applications."},
-    {"title": "Growth/Marketing Analyst (Tech)", "company": "ScaleUp Metrics",
-     "required_skills": ["SQL", "Excel", "A/B Testing", "Google Analytics"],
-     "description": "Analyze marketing funnel data to identify growth opportunities."},
-    {"title": "Embedded Systems Intern", "company": "CircuitCore",
-     "required_skills": ["C", "Embedded C", "Microcontrollers", "Debugging"],
-     "description": "Support firmware development for IoT hardware products."},
-    {"title": "Junior Prompt Engineer", "company": "DialogueWorks AI",
-     "required_skills": ["Prompt Engineering", "Python", "LLMs", "API Integration"],
-     "description": "Design and optimize prompts for production LLM-powered features."},
-]
-
-with open("sample_jobs.json", "w") as f:
-    _json.dump(SAMPLE_JOBS, f, indent=2)
-
-print(f"Loaded {len(SAMPLE_JOBS)} sample jobs.")
-
-
-# ── 3. PDF parser ────────────────────────────────────────────────────────────
+# ── 2. PDF Resume Parser ─────────────────────────────────────────────────────
 import pdfplumber
 
 
@@ -210,7 +106,37 @@ def parse_resume_pdf(file_path: str) -> str:
     return "\n".join(text_parts).strip()
 
 
-# ── 4. Skill extraction ──────────────────────────────────────────────────────
+# ── 3. OCR Engine (Screenshot / Image Input) ──────────────────────────────────
+_ocr_reader = None
+
+
+def get_ocr_reader():
+    """Lazy-load the EasyOCR reader so startup remains instantaneous."""
+    global _ocr_reader
+    if _ocr_reader is None:
+        print("🔍 Initializing OCR reader for image text extraction...")
+        import easyocr
+        _ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+    return _ocr_reader
+
+
+def extract_text_from_image(image_input) -> str:
+    """Extract raw text from a screenshot or image file using EasyOCR."""
+    if image_input is None:
+        return ""
+    try:
+        reader = get_ocr_reader()
+        # image_input can be a string filepath or a numpy array/PIL image from Gradio
+        results = reader.readtext(image_input, detail=0)
+        extracted = "\n".join(results).strip()
+        print(f"✅ OCR extracted {len(extracted)} characters from image.")
+        return extracted
+    except Exception as e:
+        print(f"⚠️ OCR extraction failed: {e}")
+        return ""
+
+
+# ── 4. Skill Extraction & Job Parsing Prompts ────────────────────────────────
 SKILL_EXTRACTION_SYSTEM_PROMPT = """You are an expert resume parser. Extract structured information
 from the resume text the user gives you. Always respond with ONLY a valid JSON object - no markdown,
 no commentary, no code fences. Use this exact schema:
@@ -231,12 +157,8 @@ Rules:
 
 
 def _coerce_profile(result) -> dict:
-    """
-    FIX 1 - Guard against the LLM returning a JSON array instead of a dict.
-    Previously caused: AttributeError: 'list' object has no attribute 'get'
-    """
+    """Ensure the LLM response is a dict matching the expected resume schema."""
     if isinstance(result, list):
-        # LLM returned a bare list of skills - wrap it into the expected schema
         return {
             "name": "",
             "skills": result,
@@ -245,7 +167,6 @@ def _coerce_profile(result) -> dict:
             "certifications": [],
         }
     if not isinstance(result, dict):
-        # Unexpected type - return a safe empty profile
         return {
             "name": "",
             "skills": [],
@@ -257,11 +178,11 @@ def _coerce_profile(result) -> dict:
 
 
 def extract_skills(resume_text: str) -> dict:
+    """Extract a candidate's structured profile from resume text."""
     raw = call_llm(SKILL_EXTRACTION_SYSTEM_PROMPT, resume_text, json_mode=True)
     try:
         return _coerce_profile(_json.loads(raw))
     except _json.JSONDecodeError:
-        # Fallback: ask the model to fix its own output
         fixed = call_llm(
             "Fix this into strictly valid JSON matching the required schema. Return ONLY JSON.",
             raw,
@@ -270,84 +191,90 @@ def extract_skills(resume_text: str) -> dict:
         return _coerce_profile(_json.loads(fixed))
 
 
-# ── 5. RAG job retrieval ─────────────────────────────────────────────────────
-import chromadb
-from sentence_transformers import SentenceTransformer
+JOB_PARSING_SYSTEM_PROMPT = """You are an expert recruitment analyst.
+Extract structured job information from the provided job description text (which may be from copied text or OCR output).
+Always respond with ONLY a valid JSON object - no markdown, no commentary, no code fences.
+Use this exact schema:
 
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+{
+  "title": "Job Title",
+  "company": "Company Name (or 'Target Company' if omitted)",
+  "required_skills": ["Skill1", "Skill2", ...],
+  "description": "Clear, concise summary of key responsibilities and qualifications"
+}
 
-chroma_client = chromadb.Client()
-# Fresh collection each run (safe to re-run)
-try:
-    chroma_client.delete_collection("jobs")
-except Exception:
-    pass
-job_collection = chroma_client.create_collection("jobs")
-
-job_docs, job_ids, job_metadatas = [], [], []
-for i, job in enumerate(SAMPLE_JOBS):
-    doc_text = f"{job['title']}. Required skills: {', '.join(job['required_skills'])}. {job['description']}"
-    job_docs.append(doc_text)
-    job_ids.append(str(i))
-    job_metadatas.append({
-        "title": job["title"],
-        "company": job["company"],
-        "required_skills": ", ".join(job["required_skills"]),
-        "description": job["description"],
-    })
-
-job_embeddings = embedder.encode(job_docs).tolist()
-
-job_collection.add(
-    ids=job_ids,
-    embeddings=job_embeddings,
-    documents=job_docs,
-    metadatas=job_metadatas,
-)
-
-print(f"Indexed {len(job_docs)} job postings into ChromaDB.")
+Rules:
+- Extract all explicitly mentioned and strongly implied technical and domain skills into 'required_skills'.
+- Normalize skill names (e.g. 'React.js' -> 'React', 'JS' -> 'JavaScript', 'AWS services' -> 'AWS').
+- If the title or company is missing, infer a realistic title or use 'Target Role' and 'Target Company'.
+"""
 
 
-def search_jobs(profile: dict, top_k: int = 5) -> list:
-    """Embed the candidate's skill profile and retrieve the most similar jobs."""
-    query_text = (
-        f"Skills: {', '.join(profile.get('skills', []))}. "
-        f"Experience: {'; '.join(profile.get('experience', []))}"
-    )
-    query_embedding = embedder.encode([query_text]).tolist()
-    results = job_collection.query(query_embeddings=query_embedding, n_results=top_k)
+def parse_job_description(raw_text: str) -> dict:
+    """Extract structured job details (title, company, required skills) from raw text or OCR."""
+    if not raw_text or not raw_text.strip():
+        return None
+    raw = call_llm(JOB_PARSING_SYSTEM_PROMPT, raw_text, json_mode=True)
+    try:
+        data = _json.loads(raw)
+    except _json.JSONDecodeError:
+        fixed = call_llm(
+            "Fix this into strictly valid JSON matching the schema. Return ONLY JSON.",
+            raw,
+            json_mode=True,
+        )
+        data = _json.loads(fixed)
 
-    matches = []
-    for i in range(len(results["ids"][0])):
-        meta = results["metadatas"][0][i]
-        distance = results["distances"][0][i]
-        similarity = max(0.0, 1 - distance / 2)  # rough cosine-ish similarity for display
-        matches.append({**meta, "similarity": round(similarity * 100, 1)})
-    return matches
+    if not isinstance(data, dict):
+        data = {
+            "title": "Target Role",
+            "company": "Target Company",
+            "required_skills": [],
+            "description": raw_text[:300],
+        }
+
+    data.setdefault("title", "Target Role")
+    data.setdefault("company", "Target Company")
+    data.setdefault("required_skills", [])
+    data.setdefault("description", raw_text[:300])
+    return data
 
 
-# ── 6. Gap analysis ──────────────────────────────────────────────────────────
-GAP_ANALYSIS_SYSTEM_PROMPT = """You compare a candidate's skills against a job's required skills.
-Respond with ONLY a valid JSON object, no markdown, using this schema:
+# ── 5. Target Job Gap Analysis ───────────────────────────────────────────────
+TARGET_JOB_GAP_PROMPT = """You are an elite technical recruiter and executive career coach.
+Perform an in-depth gap analysis comparing a candidate's resume against a specific target job posting.
+Always respond with ONLY a valid JSON object - no markdown, no code fences, using this exact schema:
 
 {
   "match_percentage": 0-100,
-  "matching_skills": ["..."],
-  "missing_skills": ["..."],
-  "learning_suggestions": ["short, concrete suggestion per missing skill"]
+  "matching_skills": ["skills the candidate clearly possesses that match the job"],
+  "missing_skills": ["required skills from the job description that the candidate lacks"],
+  "ats_keywords_to_add": ["crucial keywords, acronyms, or phrases from the job description to add to the resume"],
+  "resume_tailoring_tips": [
+    "Specific advice on how the candidate can rewrite existing project/experience bullet points to highlight relevancy for this specific job"
+  ],
+  "learning_suggestions": [
+    "Concrete, high-impact recommendations or courses to quickly learn missing skills"
+  ],
+  "verdict_summary": "A 2-3 sentence honest, encouraging assessment of how competitive the candidate is for this role."
 }
 """
 
 
-def analyze_gap(profile: dict, job: dict) -> dict:
-    user_prompt = (
-        f"Candidate skills: {profile.get('skills', [])}\n"
-        f"Candidate experience: {profile.get('experience', [])}\n\n"
-        f"Job title: {job['title']}\n"
-        f"Job required skills: {job['required_skills']}\n"
-        f"Job description: {job['description']}"
-    )
-    raw = call_llm(GAP_ANALYSIS_SYSTEM_PROMPT, user_prompt, json_mode=True)
+def analyze_target_job(profile: dict, job: dict) -> dict:
+    """Deep 1-on-1 evaluation of candidate against a target job."""
+    user_prompt = f"""Candidate Name: {profile.get('name', 'Candidate')}
+Candidate Skills: {profile.get('skills', [])}
+Candidate Experience: {profile.get('experience', [])}
+Candidate Education: {profile.get('education', [])}
+Candidate Certifications: {profile.get('certifications', [])}
+
+Target Job Title: {job.get('title', 'Target Role')}
+Target Company: {job.get('company', 'Target Company')}
+Required Skills: {job.get('required_skills', [])}
+Job Description: {job.get('description', '')}"""
+
+    raw = call_llm(TARGET_JOB_GAP_PROMPT, user_prompt, json_mode=True)
     try:
         return _json.loads(raw)
     except _json.JSONDecodeError:
@@ -359,12 +286,11 @@ def analyze_gap(profile: dict, job: dict) -> dict:
         return _json.loads(fixed)
 
 
-# ── 7. ReAct-style Agent ─────────────────────────────────────────────────────
+# ── 6. ReAct-style Agent ─────────────────────────────────────────────────────
 class ResumeMatchingAgent:
-    """A minimal ReAct-style agent: reason about state -> pick next tool -> act -> repeat."""
+    """ReAct-style agent that evaluates candidate fit against a target job description."""
 
-    def __init__(self, top_k: int = 5, min_skills: int = 2):
-        self.top_k = top_k
+    def __init__(self, min_skills: int = 2):
         self.min_skills = min_skills
         self.trace = []
 
@@ -372,11 +298,16 @@ class ResumeMatchingAgent:
         self.trace.append(msg)
         print(msg)
 
-    def run(self, resume_text: str) -> dict:
+    def run(self, resume_text: str, custom_job: dict) -> dict:
+        if not custom_job:
+            return {
+                "status": "error",
+                "message": "Please provide a job description (paste text or upload a screenshot) to match against.",
+            }
+
         self.log("🧠 [Agent] Step 1: Extracting skills from resume...")
         profile = extract_skills(resume_text)
 
-        # profile is now guaranteed to be a dict (FIX 1 applied upstream)
         if len(profile.get("skills", [])) < self.min_skills:
             self.log("⚠️ [Agent] Too few skills detected. Stopping and requesting clarification.")
             return {
@@ -389,84 +320,113 @@ class ResumeMatchingAgent:
             }
 
         self.log(f"✅ [Agent] Extracted {len(profile['skills'])} skills: {profile['skills']}")
-        self.log("🧠 [Agent] Step 2: Retrieving candidate jobs via RAG...")
-        matches = search_jobs(profile, top_k=self.top_k)
-
-        if not matches:
-            self.log("⚠️ [Agent] No jobs found. Broadening search is not possible with current data.")
-            return {"status": "no_matches", "profile": profile}
-
-        self.log(f"✅ [Agent] Retrieved {len(matches)} candidate jobs.")
-        self.log("🧠 [Agent] Step 3: Running gap analysis for each match...")
-
-        results = []
-        for m in matches:
-            job_lookup = {
-                "title": m["title"],
-                "required_skills": m["required_skills"].split(", "),
-                "description": m["description"],
-            }
-            gap = analyze_gap(profile, job_lookup)
-            results.append({**m, **gap})
-
-        results.sort(key=lambda r: r.get("match_percentage", 0), reverse=True)
-        self.log("✅ [Agent] Gap analysis complete. Compiling final report.")
-
-        return {"status": "ok", "profile": profile, "results": results}
+        self.log(f"🎯 [Agent] Target Job Mode: Analyzing fit for '{custom_job.get('title')}' @ '{custom_job.get('company')}'...")
+        target_analysis = analyze_target_job(profile, custom_job)
+        self.log("✅ [Agent] Target job analysis complete. Compiling tailored report.")
+        return {
+            "status": "ok",
+            "mode": "target_job",
+            "profile": profile,
+            "job": custom_job,
+            "analysis": target_analysis,
+        }
 
 
-# ── 8. Report generator ──────────────────────────────────────────────────────
+# ── 7. Report Generator ──────────────────────────────────────────────────────
 def generate_report(agent_output: dict) -> str:
-    if agent_output["status"] != "ok":
-        return f"⚠️ {agent_output.get('message', 'Could not generate a report.')}"
+    """Generate Markdown report for Target Job Mode."""
+    if agent_output.get("status") != "ok":
+        return f"### ⚠️ {agent_output.get('message', 'Could not generate a report.')}"
 
     profile = agent_output["profile"]
-    lines = []
-    lines.append(f"# Resume Analysis Report for {profile.get('name', 'Candidate')}\n")
-    lines.append(f"**Extracted Skills:** {', '.join(profile.get('skills', []))}\n")
-    lines.append("## Top Job Matches\n")
+    candidate_name = profile.get("name") or "Candidate"
+    job = agent_output["job"]
+    analysis = agent_output["analysis"]
+    match_score = analysis.get("match_percentage", "N/A")
 
-    for i, r in enumerate(agent_output["results"], 1):
-        lines.append(f"### {i}. {r['title']} @ {r['company']}")
-        lines.append(
-            f"- **Match score:** {r.get('match_percentage', 'N/A')}%"
-            f"  (retrieval similarity: {r['similarity']}%)"
-        )
-        lines.append(f"- **Matching skills:** {', '.join(r.get('matching_skills', [])) or 'None'}")
-        lines.append(f"- **Missing skills:** {', '.join(r.get('missing_skills', [])) or 'None'}")
-        if r.get("learning_suggestions"):
-            lines.append("- **How to close the gap:**")
-            for s in r["learning_suggestions"]:
-                lines.append(f"  - {s}")
-        lines.append("")
+    lines = [
+        f"# 🎯 Target Job Match Report: {job.get('title')} @ {job.get('company')}",
+        f"**Candidate:** {candidate_name} | **Role:** {job.get('title')}\n",
+        f"### 📊 Overall Match Score: **{match_score}%**",
+        f"> {analysis.get('verdict_summary', '')}\n",
+        "---",
+        "## 🔍 Skills Breakdown",
+        f"- **✅ Matching Skills Found:** {', '.join(analysis.get('matching_skills', [])) or 'None detected'}",
+        f"- **❌ Missing Required Skills:** {', '.join(analysis.get('missing_skills', [])) or 'None! You meet all listed skill requirements'}",
+        f"- **🏷️ Key ATS Keywords to Include:** {', '.join(analysis.get('ats_keywords_to_add', [])) or 'None'}\n",
+        "---",
+        "## 📝 Actionable Resume Tailoring Suggestions",
+    ]
+
+    bullet_tips = analysis.get("resume_tailoring_tips", [])
+    if bullet_tips:
+        for tip in bullet_tips:
+            lines.append(f"- 💡 {tip}")
+    else:
+        lines.append("- Your resume already closely aligns with this job posting.")
+
+    lines.append("\n---")
+    lines.append("## 📚 Skill Gap Roadmap & Learning Resources")
+    learn_tips = analysis.get("learning_suggestions", [])
+    if learn_tips:
+        for tip in learn_tips:
+            lines.append(f"- 🚀 {tip}")
+    else:
+        lines.append("- No critical skill gaps identified!")
 
     return "\n".join(lines)
 
 
-# ── 9. Gradio UI ─────────────────────────────────────────────────────────────
-import gradio as gr
+# ── 8. Unified Pipeline Callback ────────────────────────────────────────────
+def run_pipeline(resume_file, resume_pasted_text, job_pasted_text, job_image_file):
+    """
+    Main pipeline entrypoint handling:
+      - Resume from PDF or pasted text
+      - Target Job from pasted text or image screenshot (EasyOCR)
+    """
+    # 1. Resolve Resume Text
+    resume_text = ""
+    if resume_file is not None:
+        file_path = resume_file if isinstance(resume_file, str) else resume_file.name
+        resume_text = parse_resume_pdf(file_path)
 
+    if not resume_text.strip() and resume_pasted_text and resume_pasted_text.strip():
+        resume_text = resume_pasted_text.strip()
 
-def run_pipeline_from_pdf(pdf_file):
-    if pdf_file is None:
-        return "Please upload a resume PDF."
-
-    # FIX 2 - Gradio >= 4.x passes a plain str path; <= 3.x passes a NamedString with .name
-    # Previously crashed with: AttributeError: 'str' object has no attribute 'name'
-    file_path = pdf_file if isinstance(pdf_file, str) else pdf_file.name
-
-    text = parse_resume_pdf(file_path)
-
-    # FIX 3 - Guard for image-only / scanned PDFs with no extractable text
-    if not text.strip():
+    if not resume_text.strip():
         return (
-            "Could not extract any text from the uploaded PDF. "
-            "Please ensure it is not a scanned image-only document."
-        )
+            "### ⚠️ Please provide a resume!\n\n"
+            "Upload a resume PDF or paste your resume text in the box."
+        ), {}
 
+    # 2. Resolve Target Job Description
+    raw_job_text = ""
+
+    # Check if a screenshot/image of the job description was uploaded
+    if job_image_file is not None:
+        img_path = job_image_file if isinstance(job_image_file, str) else getattr(job_image_file, "name", None)
+        raw_job_text = extract_text_from_image(img_path or job_image_file)
+
+    # Check if job description text was pasted (pasted text overrides or supplements image)
+    if job_pasted_text and job_pasted_text.strip():
+        raw_job_text = job_pasted_text.strip()
+
+    if not raw_job_text.strip():
+        return (
+            "### ⚠️ Please provide a target job description!\n\n"
+            "Paste the job description text or upload a screenshot to match against."
+        ), {}
+
+    print("📋 Parsing custom Job Description...")
+    custom_job = parse_job_description(raw_job_text)
+    print(f"🎯 Target Job parsed: {custom_job.get('title')} @ {custom_job.get('company')}")
+
+    # 3. Run Agent
     try:
-        output = ResumeMatchingAgent(top_k=5).run(text)
-        return generate_report(output)
+        agent = ResumeMatchingAgent()
+        output = agent.run(resume_text, custom_job=custom_job)
+        report_md = generate_report(output)
+        return report_md, output
     except Exception as e:
         err_str = str(e)
         if "invalid_api_key" in err_str.lower() or "401" in err_str:
@@ -475,23 +435,262 @@ def run_pipeline_from_pdf(pdf_file):
                 "Groq rejected your API key (`401 Invalid API Key`).\n\n"
                 "**How to fix:**\n"
                 "1. Go to [Groq Console API Keys](https://console.groq.com/keys)\n"
-                "2. Click **Create API Key** and copy the new key\n"
+                "2. Create a new API key (starts with 'gsk_')\n"
                 "3. Open `.env` in this project and paste it:\n"
                 "   ```env\n"
                 "   GROQ_API_KEY=gsk_your_new_key_here\n"
                 "   ```\n"
                 "4. Restart `python resume_analyzer.py`"
+            ), {}
+        return f"### ⚠️ An error occurred during analysis:\n\n`{err_str}`", {}
+
+
+# ── 9. Modern Gradio Interface ──────────────────────────────────────────────
+import gradio as gr
+
+custom_css = """
+.main-title { text-align: center; margin-bottom: 8px; font-weight: 700; }
+.sub-title { text-align: center; color: #888; margin-bottom: 24px; }
+"""
+
+with gr.Blocks(title="AI Resume Analyzer & Job Matching Agent") as demo:
+    gr.Markdown("# 🚀 AI Resume Analyzer & Job Matching Agent", elem_classes=["main-title"])
+    gr.Markdown(
+        "Upload your resume and match it against **any target Job Description** (pasted text or screenshot).",
+        elem_classes=["sub-title"],
+    )
+
+    with gr.Row():
+        # ── Left Column: Inputs ──
+        with gr.Column(scale=1):
+            gr.Markdown("### 📄 1. Your Resume")
+            resume_file_input = gr.File(
+                label="Upload Resume (PDF)",
+                file_types=[".pdf"],
             )
-        return f"### ⚠️ An error occurred during analysis:\n\n`{err_str}`"
+            with gr.Accordion("Or paste resume text directly", open=False):
+                resume_text_input = gr.Textbox(
+                    label="Pasted Resume Text",
+                    placeholder="Paste your raw resume text here if you don't have a PDF...",
+                    lines=6,
+                )
+
+            gr.Markdown("### 🎯 2. Target Job Description")
+            with gr.Tabs():
+                with gr.Tab("📋 Paste Job Description"):
+                    job_text_input = gr.Textbox(
+                        label="Job Posting Text",
+                        placeholder="Paste the job title, requirements, or full posting from LinkedIn, Indeed, etc...",
+                        lines=7,
+                    )
+                with gr.Tab("🖼️ Upload Job Screenshot"):
+                    job_image_input = gr.Image(
+                        label="Screenshot of Job Posting (PNG, JPG)",
+                        type="filepath",
+                    )
+                    gr.Markdown("💡 *Takes a screenshot from LinkedIn or job boards. EasyOCR extracts the requirements automatically.*")
+
+            with gr.Row():
+                submit_btn = gr.Button("🚀 Analyze & Match", variant="primary", size="lg")
+                clear_btn = gr.Button("🔄 Clear All", size="lg")
+
+        # ── Right Column: Outputs ──
+        with gr.Column(scale=1):
+            gr.Markdown("### 📊 Recommendation & Gap Analysis Report")
+            report_output = gr.Markdown(
+                value="*Your detailed match report and recommendations will appear here after clicking **Analyze & Match**.*"
+            )
+            with gr.Accordion("🔍 View Extracted Structured Data (JSON)", open=False):
+                json_output = gr.JSON(label="Agent Raw Output")
+
+    # Wire event handlers
+    submit_btn.click(
+        fn=run_pipeline,
+        inputs=[resume_file_input, resume_text_input, job_text_input, job_image_input],
+        outputs=[report_output, json_output],
+    )
+
+    def clear_all():
+        return None, "", "", None, "*Cleared. Ready for new analysis.*", {}
+
+    clear_btn.click(
+        fn=clear_all,
+        inputs=[],
+        outputs=[resume_file_input, resume_text_input, job_text_input, job_image_input, report_output, json_output],
+    )
 
 
-demo = gr.Interface(
-    fn=run_pipeline_from_pdf,
-    inputs=gr.File(label="Upload Resume (PDF)", file_types=[".pdf"]),
-    outputs=gr.Markdown(label="Recommendation Report"),
-    title="AI Resume Analyzer & Job Matching Agent",
-    description="Agentic AI: LLM skill extraction + RAG job retrieval + gap analysis (Groq-powered).",
-)
+# ── 10. FastAPI Application & Stitch Dashboard Server ────────────────────────
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from typing import Optional
+import uvicorn
+import tempfile
+import os
+import shutil
+import socket
+import webbrowser
+
+app = FastAPI(title="AI Resume Analyzer & Job Matching Agent")
+
+# Mount static files for Stitch assets (images, logos, styles)
+stitch_assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stitch_assets")
+if os.path.isdir(stitch_assets_dir):
+    app.mount("/stitch_assets", StaticFiles(directory=stitch_assets_dir), name="stitch_assets")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    """Serves the AI Resume Match Agent Dashboard."""
+    dashboard_path = os.path.join(stitch_assets_dir, "dashboard_dualtone.html")
+    if not os.path.exists(dashboard_path):
+        return HTMLResponse("<h1>Error: dashboard template not found.</h1>", status_code=404)
+    with open(dashboard_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return HTMLResponse(content=content)
+
+
+@app.post("/api/analyze")
+async def api_analyze(
+    resume_file: Optional[UploadFile] = File(None),
+    resume_text: str = Form(""),
+    job_text: str = Form(""),
+    job_image: Optional[UploadFile] = File(None),
+):
+    """
+    Unified API endpoint powering the Stitch UI:
+      - Accepts PDF or raw text resumes
+      - Accepts target job text or screenshot image (EasyOCR)
+    """
+    try:
+        # 1. Extract Resume Text
+        extracted_resume = ""
+        if resume_file is not None and getattr(resume_file, "filename", None):
+            suffix = os.path.splitext(resume_file.filename)[1] or ".pdf"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                shutil.copyfileobj(resume_file.file, tmp)
+                tmp_path = tmp.name
+            try:
+                extracted_resume = parse_resume_pdf(tmp_path)
+            finally:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+
+        if not extracted_resume.strip() and resume_text and resume_text.strip():
+            extracted_resume = resume_text.strip()
+
+        if not extracted_resume.strip():
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "Please upload a resume PDF or paste resume text before analyzing."
+                }
+            )
+
+        # 2. Extract Job Description
+        custom_job = None
+        raw_job_text = ""
+
+        if job_image is not None and getattr(job_image, "filename", None):
+            suffix = os.path.splitext(job_image.filename)[1] or ".png"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                shutil.copyfileobj(job_image.file, tmp)
+                tmp_img_path = tmp.name
+            try:
+                raw_job_text = extract_text_from_image(tmp_img_path)
+            finally:
+                try:
+                    os.remove(tmp_img_path)
+                except Exception:
+                    pass
+
+        if job_text and job_text.strip():
+            raw_job_text = job_text.strip()
+
+        if not raw_job_text.strip():
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "Please paste a job description or upload a screenshot to match against."
+                }
+            )
+
+        custom_job = parse_job_description(raw_job_text)
+
+        # 3. Run Agent Pipeline
+        agent = ResumeMatchingAgent()
+        output = agent.run(extracted_resume, custom_job=custom_job)
+
+        if output.get("status") != "ok":
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": output.get("message", "Could not complete analysis. Check resume details.")
+                }
+            )
+
+        return JSONResponse(content=output)
+
+    except Exception as e:
+        err_msg = str(e)
+        if "invalid_api_key" in err_msg.lower() or "401" in err_msg:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "status": "error",
+                    "message": "Groq rejected your API key (401 Invalid API Key). Please update GROQ_API_KEY in .env."
+                }
+            )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Server error: {err_msg}"
+            }
+        )
+
+
+# Mount Gradio interface under /gradio for backward compatibility
+try:
+    gr.mount_gradio_app(app, demo, path="/gradio")
+except Exception as _mount_err:
+    print(f"Notice: Gradio secondary mount warning: {_mount_err}")
+
+
+def find_free_port(start_port: int = 7860, max_tries: int = 20) -> int:
+    """Find the first available TCP port."""
+    for port in range(start_port, start_port + max_tries):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.3)
+            if s.connect_ex(("127.0.0.1", port)) != 0:
+                return port
+    return start_port
+
 
 if __name__ == "__main__":
-    demo.launch(debug=False, share=True)
+    # Check if a custom port was requested, otherwise find first free port starting at 7860
+    default_port = int(os.environ.get("PORT", "7860"))
+    port = find_free_port(default_port)
+
+    print("\n" + "=" * 70)
+    print("  🚀 AI RESUME ANALYZER & JOB MATCHING AGENT")
+    print("  🎯 Direct 1-on-1 Matching: Paste Job Description or Screenshot")
+    print("  ⚡ Powered by Groq LPU (openai/gpt-oss-120b) + EasyOCR")
+    print("=" * 70)
+    print(f"  👉 Web Dashboard:             http://127.0.0.1:{port}")
+    print(f"  👉 Fallback Gradio Interface: http://127.0.0.1:{port}/gradio")
+    print("=" * 70 + "\n")
+
+    # Try opening browser automatically for seamless user experience
+    try:
+        webbrowser.open(f"http://127.0.0.1:{port}")
+    except Exception:
+        pass
+
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")

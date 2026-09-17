@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+    <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="#121B2B" stroke="#1E293B" stroke-width="1.5"/>
+  <path d="M14 16C14 13.7909 15.7909 12 18 12H26L34 20V32C34 34.2091 32.2091 36 30 36H18C15.7909 36 14 34.2091 14 32V16Z" fill="#1E293B" fill-opacity="0.5" stroke="#6366F1" stroke-width="1.5"/>
+  <path d="M26 12V20H34" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="21" cy="24" r="1.5" fill="#38BDF8"/>
+  <circle cx="27" cy="24" r="1.5" fill="#38BDF8"/>
+  <path d="M19 28H29" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M33 11L34.2 13.8L37 15L34.2 16.2L33 19L31.8 16.2L29 15L31.8 13.8L33 11Z" fill="url(#sparkleGrad)"/>
+  <circle cx="36" cy="28" r="1" fill="#10B981"/>
+</svg>
