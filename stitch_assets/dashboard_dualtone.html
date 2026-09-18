@@ -102,12 +102,12 @@
 </nav>
 </div>
 </aside>
-<!-- MAIN BODY CONTENT: SPLIT 60% / 40% -->
-<div class="flex-1 flex flex-col lg:flex-row min-w-0 bg-[#f7f9fc]">
+<!-- MAIN BODY CONTENT: BALANCED DUAL-TONE SPLIT (RESIZABLE) -->
+<div id="mainSplitBody" class="flex-1 flex flex-col lg:flex-row min-w-0 bg-[#f7f9fc]">
 <!-- ============================================================ -->
-<!-- LEFT 60% AREA: PORCELAIN / CREAM NEUMORPHIC CANVAS           -->
+<!-- LEFT AREA: PORCELAIN / CREAM NEUMORPHIC CANVAS               -->
 <!-- ============================================================ -->
-<section class="w-full lg:w-[57%] p-5 sm:p-7 md:p-8 xl:p-9 flex flex-col justify-between gap-6 overflow-y-auto custom-scrollbar">
+<section id="leftSection" class="w-full lg:w-1/2 p-5 sm:p-7 md:p-8 xl:p-8 flex flex-col justify-between gap-6 overflow-y-auto custom-scrollbar">
 <div class="flex flex-col gap-6">
 <!-- Top Clean Header Bar -->
 <div class="flex items-center justify-between gap-4">
@@ -120,9 +120,9 @@
               </p>
 </div>
 <div class="flex items-center gap-2">
-  <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 border border-emerald-100">
+  <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 border border-emerald-100 shrink-0">
     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-    Groq LPU Engine Active
+    Groq LPU Active
   </span>
 </div>
 </div>
@@ -427,10 +427,20 @@
 </div>
 </div>
 </section>
+
+<!-- INTERACTIVE SLIM RESIZER SPLITTER LINE / DRAG HANDLE -->
+<div id="splitResizer" class="hidden lg:flex flex-col items-center justify-center relative w-[3px] hover:w-1 bg-slate-200/90 hover:bg-amber-400 active:bg-amber-500 cursor-col-resize transition-all select-none z-30 shrink-0 group before:absolute before:-inset-x-2 before:inset-y-0 before:cursor-col-resize" title="Drag horizontally to resize panels • Double-click to reset 50:50">
+  <!-- Draggable slim pill indicator -->
+  <div class="w-3.5 h-7 rounded-full bg-white group-hover:bg-amber-500 shadow-xs border border-slate-300 group-hover:border-amber-400 flex flex-col items-center justify-center gap-0.5 transition-all text-slate-400 group-hover:text-white pointer-events-none">
+    <span class="w-1.5 h-0.5 rounded-full bg-current opacity-70"></span>
+    <span class="w-1.5 h-0.5 rounded-full bg-current opacity-70"></span>
+  </div>
+</div>
+
 <!-- ============================================================ -->
-<!-- RIGHT 40% AREA: DEEP CHARCOAL / DARK OBSIDIAN PANEL (#212529)-->
+<!-- RIGHT AREA: DEEP CHARCOAL / DARK OBSIDIAN PANEL (#212529)    -->
 <!-- ============================================================ -->
-<section class="w-full lg:w-[43%] bg-[#212529] text-white p-5 sm:p-7 md:p-8 xl:p-8 flex flex-col gap-5 overflow-y-auto dark-scrollbar border-t lg:border-t-0 lg:border-l border-slate-800">
+<section id="rightSection" class="w-full lg:w-1/2 bg-[#212529] text-white p-5 sm:p-7 md:p-8 xl:p-8 flex flex-col gap-5 overflow-y-auto dark-scrollbar border-t lg:border-t-0 border-slate-800">
 <!-- Top Header with Dropdown (Like "BMI Calculator" in Image 4) -->
 <div class="flex items-center justify-between">
 <div>
@@ -594,6 +604,80 @@
 </div>
 <!-- Interactive Logic Scripts -->
 <script>
+    // ── DUAL-TONE SLIM SPLIT RESIZER ────────────────────────────
+    const mainSplitBody = document.getElementById('mainSplitBody');
+    const leftSection = document.getElementById('leftSection');
+    const rightSection = document.getElementById('rightSection');
+    const splitResizer = document.getElementById('splitResizer');
+
+    function setSplitPercentage(percent) {
+      if (!leftSection || !rightSection) return;
+      const clamped = Math.max(25, Math.min(75, percent));
+      leftSection.style.width = `${clamped}%`;
+      rightSection.style.width = `${100 - clamped}%`;
+      leftSection.classList.remove('lg:w-1/2');
+      rightSection.classList.remove('lg:w-1/2');
+
+      try {
+        localStorage.setItem('resume_dashboard_split', clamped.toFixed(1));
+      } catch (e) {}
+    }
+
+    let isDraggingSplit = false;
+
+    if (splitResizer && mainSplitBody) {
+      splitResizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isDraggingSplit = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDraggingSplit) return;
+        const rect = mainSplitBody.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const percent = (offsetX / rect.width) * 100;
+        setSplitPercentage(percent);
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDraggingSplit) {
+          isDraggingSplit = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+      });
+
+      splitResizer.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) isDraggingSplit = true;
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (!isDraggingSplit || e.touches.length !== 1) return;
+        const rect = mainSplitBody.getBoundingClientRect();
+        const touchX = e.touches[0].clientX - rect.left;
+        const percent = (touchX / rect.width) * 100;
+        setSplitPercentage(percent);
+      }, { passive: true });
+
+      window.addEventListener('touchend', () => {
+        isDraggingSplit = false;
+      });
+
+      splitResizer.addEventListener('dblclick', () => {
+        setSplitPercentage(50);
+      });
+
+      try {
+        const saved = localStorage.getItem('resume_dashboard_split');
+        if (saved) {
+          const p = parseFloat(saved);
+          if (!isNaN(p) && p >= 25 && p <= 75) setSplitPercentage(p);
+        }
+      } catch (e) {}
+    }
+
     // Tab Switching Logic for Target JD (Paste vs Screenshot OCR)
     const tabBtnA = document.getElementById('tabBtnA');
     const tabBtnB = document.getElementById('tabBtnB');
