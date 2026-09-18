@@ -242,8 +242,8 @@ def parse_job_description(raw_text: str) -> dict:
 
 
 # ── 5. Target Job Gap Analysis ───────────────────────────────────────────────
-TARGET_JOB_GAP_PROMPT = """You are an elite technical recruiter and executive career coach.
-Perform an in-depth gap analysis comparing a candidate's resume against a specific target job posting.
+TARGET_JOB_GAP_PROMPT = """You are an elite technical recruiter, resume writer, and executive career coach.
+Perform an in-depth gap analysis comparing a candidate's resume against a specific target job posting, and generate tailored resume bullet points.
 Always respond with ONLY a valid JSON object - no markdown, no code fences, using this exact schema:
 
 {
@@ -251,6 +251,13 @@ Always respond with ONLY a valid JSON object - no markdown, no code fences, usin
   "matching_skills": ["skills the candidate clearly possesses that match the job"],
   "missing_skills": ["required skills from the job description that the candidate lacks"],
   "ats_keywords_to_add": ["crucial keywords, acronyms, or phrases from the job description to add to the resume"],
+  "tailored_bullet_points": [
+    {
+      "bullet": "Rewritten resume bullet point using STAR framework (Situation, Task, Action, Result) with strong action verbs (e.g. Engineered, Spearheaded, Architected, Optimized), quantifying impact or metrics, and naturally infusing missing ATS keywords and technologies required for this specific role.",
+      "keywords_infused": ["Keyword1", "Keyword2"],
+      "action_verb": "Architected"
+    }
+  ],
   "resume_tailoring_tips": [
     "Specific advice on how the candidate can rewrite existing project/experience bullet points to highlight relevancy for this specific job"
   ],
@@ -259,6 +266,11 @@ Always respond with ONLY a valid JSON object - no markdown, no code fences, usin
   ],
   "verdict_summary": "A 2-3 sentence honest, encouraging assessment of how competitive the candidate is for this role."
 }
+
+Rules for tailored_bullet_points:
+- Provide 3 to 4 strong, impactful STAR-format bullet points tailored specifically for this target job.
+- Base them on the candidate's actual background/projects, but elevate the phrasing and integrate the target role's key technical requirements.
+- Highlight metrics or quantifiable impact where plausible.
 """
 
 
@@ -277,14 +289,27 @@ Job Description: {job.get('description', '')}"""
 
     raw = call_llm(TARGET_JOB_GAP_PROMPT, user_prompt, json_mode=True)
     try:
-        return _json.loads(raw)
+        data = _json.loads(raw)
     except _json.JSONDecodeError:
         fixed = call_llm(
             "Fix this into strictly valid JSON matching the schema. Return ONLY JSON.",
             raw,
             json_mode=True,
         )
-        return _json.loads(fixed)
+        data = _json.loads(fixed)
+
+    if not isinstance(data, dict):
+        data = {}
+
+    data.setdefault("match_percentage", 50)
+    data.setdefault("matching_skills", [])
+    data.setdefault("missing_skills", [])
+    data.setdefault("ats_keywords_to_add", [])
+    data.setdefault("tailored_bullet_points", [])
+    data.setdefault("resume_tailoring_tips", [])
+    data.setdefault("learning_suggestions", [])
+    data.setdefault("verdict_summary", "Evaluation complete.")
+    return data
 
 
 # ── 6. ReAct-style Agent ─────────────────────────────────────────────────────
@@ -335,27 +360,36 @@ class ResumeMatchingAgent:
 
         self.log(f"✅ [Agent] Extracted {len(profile['skills'])} skills: {profile['skills']}")
 
-        # 3. Analyze each job description against the resume profile
-        ranked_jobs = []
+        # 3. Analyze job description(s) against the resume profile (in parallel if multiple)
         total = len(jobs_to_process)
-        for idx, job in enumerate(jobs_to_process, 1):
+
+        def _evaluate_job(indexed_job):
+            idx, job = indexed_job
             title = job.get("title", "Target Role")
             company = job.get("company", "Target Company")
             self.log(f"🎯 [Agent] Analyzing job {idx}/{total}: '{title}' @ '{company}'...")
             target_analysis = analyze_target_job(profile, job)
             score = target_analysis.get("match_percentage", 0)
-            ranked_jobs.append({
+            return {
                 "job": job,
                 "analysis": target_analysis,
                 "match_percentage": score,
                 "matching_skills_count": len(target_analysis.get("matching_skills", [])),
                 "missing_skills_count": len(target_analysis.get("missing_skills", [])),
-            })
+            }
+
+        if total == 1:
+            ranked_jobs = [_evaluate_job((1, jobs_to_process[0]))]
+        else:
+            self.log(f"⚡ [Agent] Launching parallel evaluation for {total} roles simultaneously via ThreadPoolExecutor...")
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=min(total, 6)) as executor:
+                ranked_jobs = list(executor.map(_evaluate_job, enumerate(jobs_to_process, 1)))
 
         # 4. Sort ranked jobs descending by match_percentage
         ranked_jobs.sort(key=lambda x: x.get("match_percentage", 0), reverse=True)
         best_match = ranked_jobs[0]
-        self.log(f"✅ [Agent] Analysis complete for {total} job(s). Top match: '{best_match['job'].get('title')}' ({best_match['match_percentage']}%).")
+        self.log(f"✅ [Agent] Parallel analysis complete for {total} job(s). Top match: '{best_match['job'].get('title')}' ({best_match['match_percentage']}%).")
 
         return {
             "status": "ok",
@@ -421,6 +455,16 @@ def generate_report(agent_output: dict) -> str:
             lines.append(f"- 💡 {tip}")
     else:
         lines.append("- Your resume already closely aligns with this job posting.")
+
+    tailored_bullets = analysis.get("tailored_bullet_points", [])
+    if tailored_bullets:
+        lines.append("\n---")
+        lines.append("## ✍️ AI-Tailored Resume Bullet Points (STAR Framework)")
+        for b in tailored_bullets:
+            bullet_text = b.get("bullet") if isinstance(b, dict) else str(b)
+            keywords = b.get("keywords_infused", []) if isinstance(b, dict) else []
+            kw_tag = f" *(ATS Keywords: {', '.join(keywords)})*" if keywords else ""
+            lines.append(f"- ✦ **{bullet_text}**{kw_tag}")
 
     lines.append("\n---")
     lines.append("## 📚 Skill Gap Roadmap & Learning Resources")

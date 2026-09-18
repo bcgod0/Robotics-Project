@@ -546,6 +546,31 @@
 </div>
 </div>
 </div>
+<!-- AI-Tailored Resume Bullet Points (STAR Method) -->
+<div class="bg-[#2b3036] rounded-2xl p-4 sm:p-5 border border-slate-700/60 shadow-dark-subtle flex flex-col gap-3">
+  <div class="flex items-center justify-between">
+    <div>
+      <h3 class="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px] text-amber-400">auto_fix_high</span>
+        AI-Tailored Resume Bullet Points
+      </h3>
+      <p class="text-[10px] text-slate-400 mt-0.5">Elevated with STAR method &amp; role-specific ATS keywords</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" id="copyAllBulletsBtn" class="hidden px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-300 border border-amber-500/30 text-[10px] font-bold transition-all items-center gap-1 cursor-pointer shadow-sm">
+        <span class="material-symbols-outlined text-[13px]">content_copy</span>
+        <span id="copyAllBulletsText">Copy All</span>
+      </button>
+      <span class="text-[10px] font-semibold text-amber-300 bg-amber-950/80 border border-amber-800/80 px-2.5 py-0.5 rounded-full shrink-0" id="tailoredBulletsBadge">STAR Ready</span>
+    </div>
+  </div>
+  <!-- Bullets list container -->
+  <div id="tailoredBulletsContainer" class="flex flex-col gap-2.5">
+    <div class="p-3.5 rounded-xl bg-[#212529] text-xs text-slate-400 text-center italic border border-slate-700/60">
+      Role-tailored STAR bullet points will be generated automatically here.
+    </div>
+  </div>
+</div>
 <!-- Recommended Upskilling Fast-Track -->
 <div class="bg-[#2b3036] rounded-2xl p-4 sm:p-5 border border-slate-700/60 shadow-dark-subtle flex flex-col gap-3">
 <div class="flex items-center justify-between">
@@ -934,10 +959,24 @@
       stagedJobs = [];
       updateStagedUI();
       currentAnalysisResponse = null;
+      window.activeTailoredBullets = [];
       const card = document.getElementById('multiJobLeaderboardCard');
       if (card) {
         card.classList.add('hidden');
         card.classList.remove('flex');
+      }
+      const bulletsBox = document.getElementById('tailoredBulletsContainer');
+      if (bulletsBox) {
+        bulletsBox.innerHTML = '<div class="p-3.5 rounded-xl bg-[#212529] text-xs text-slate-400 text-center italic border border-slate-700/60">Role-tailored STAR bullet points will be generated automatically here.</div>';
+      }
+      const copyAll = document.getElementById('copyAllBulletsBtn');
+      if (copyAll) {
+        copyAll.classList.add('hidden');
+        copyAll.classList.remove('flex');
+      }
+      const bulletsBadge = document.getElementById('tailoredBulletsBadge');
+      if (bulletsBadge) {
+        bulletsBadge.textContent = 'STAR Ready';
       }
     });
 
@@ -1086,7 +1125,66 @@
         `).join('') || '<span class="text-xs text-emerald-400">None! You meet all listed requirements.</span>';
       }
 
-      // 5. Learning Fast-Track
+      // 5. AI-Tailored Resume Bullet Points (STAR Method)
+      const tailoredBullets = analysis.tailored_bullet_points || [];
+      const bulletsContainer = document.getElementById("tailoredBulletsContainer");
+      const copyAllBtn = document.getElementById("copyAllBulletsBtn");
+      const bulletsBadge = document.getElementById("tailoredBulletsBadge");
+
+      if (bulletsBadge) {
+        bulletsBadge.textContent = tailoredBullets.length > 0 ? `${tailoredBullets.length} STAR Bullets` : 'STAR Ready';
+      }
+
+      if (bulletsContainer && tailoredBullets.length > 0) {
+        if (copyAllBtn) {
+          copyAllBtn.classList.remove('hidden');
+          copyAllBtn.classList.add('flex');
+        }
+        window.activeTailoredBullets = tailoredBullets;
+
+        bulletsContainer.innerHTML = tailoredBullets.map((item, i) => {
+          const bulletText = (typeof item === 'object' && item.bullet) ? item.bullet : String(item);
+          const keywords = (typeof item === 'object' && item.keywords_infused) ? item.keywords_infused : [];
+
+          return `
+            <div class="p-3.5 rounded-xl bg-[#212529] hover:bg-[#1e2227] transition-all border border-slate-700/70 flex flex-col gap-2 shadow-sm group">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-2.5 min-w-0 flex-1">
+                  <span class="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                    ${i + 1}
+                  </span>
+                  <p class="text-xs text-slate-100 leading-relaxed font-medium select-text break-words">
+                    ${bulletText}
+                  </p>
+                </div>
+                <button type="button" onclick="copyTailoredBullet(${i}, this)" class="px-2.5 py-1 bg-[#2b3036] hover:bg-slate-700 active:scale-95 text-slate-200 hover:text-white border border-slate-600 rounded-lg text-[10px] font-semibold flex items-center gap-1 shrink-0 transition-all cursor-pointer shadow-2xs" title="Copy bullet point to clipboard">
+                  <span class="material-symbols-outlined text-[13px]">content_copy</span>
+                  <span>Copy</span>
+                </button>
+              </div>
+              ${keywords.length > 0 ? `
+                <div class="flex flex-wrap items-center gap-1.5 pl-7 pt-0.5">
+                  <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Infused ATS Keywords:</span>
+                  ${keywords.map(kw => `
+                    <span class="px-1.5 py-0.5 rounded bg-cyan-950/80 border border-cyan-800/80 text-cyan-300 text-[10px] font-mono">
+                      + ${kw}
+                    </span>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      } else if (bulletsContainer) {
+        if (copyAllBtn) {
+          copyAllBtn.classList.add('hidden');
+          copyAllBtn.classList.remove('flex');
+        }
+        window.activeTailoredBullets = [];
+        bulletsContainer.innerHTML = '<div class="p-3.5 rounded-xl bg-[#212529] text-xs text-slate-400 text-center italic border border-slate-700/60">Role-tailored STAR bullet points will appear here after analysis.</div>';
+      }
+
+      // 6. Learning Fast-Track
       const learning = analysis.learning_suggestions || [];
       const learnBox = document.getElementById("learningRoadmapContainer");
       const hoursBox = document.getElementById("upskillingTotalHours");
@@ -1115,6 +1213,48 @@
       } else if (learnBox) {
         learnBox.innerHTML = '<div class="p-3.5 rounded-xl bg-[#212529] text-xs text-emerald-400 text-center border border-emerald-900/40">No critical skill gaps identified! You meet all listed requirements.</div>';
       }
+    }
+
+    // Copy single bullet point helper
+    window.copyTailoredBullet = function(index, btnElement) {
+      if (!window.activeTailoredBullets || !window.activeTailoredBullets[index]) return;
+      const item = window.activeTailoredBullets[index];
+      const text = (typeof item === 'object' && item.bullet) ? item.bullet : String(item);
+
+      navigator.clipboard.writeText(text).then(() => {
+        const origHTML = btnElement.innerHTML;
+        btnElement.innerHTML = `<span class="material-symbols-outlined text-[13px] text-emerald-400">check</span><span class="text-emerald-400 font-bold">Copied!</span>`;
+        btnElement.classList.add('border-emerald-500/60');
+        setTimeout(() => {
+          btnElement.innerHTML = origHTML;
+          btnElement.classList.remove('border-emerald-500/60');
+        }, 2000);
+      }).catch(err => {
+        console.warn("Clipboard write failed:", err);
+      });
+    };
+
+    // Copy all bullets button helper
+    const copyAllBulletsBtn = document.getElementById("copyAllBulletsBtn");
+    const copyAllBulletsText = document.getElementById("copyAllBulletsText");
+    if (copyAllBulletsBtn) {
+      copyAllBulletsBtn.addEventListener('click', () => {
+        if (!window.activeTailoredBullets || window.activeTailoredBullets.length === 0) return;
+        const allText = window.activeTailoredBullets.map(item => {
+          const b = (typeof item === 'object' && item.bullet) ? item.bullet : String(item);
+          return `• ${b}`;
+        }).join('\n\n');
+
+        navigator.clipboard.writeText(allText).then(() => {
+          const orig = copyAllBulletsText.textContent;
+          copyAllBulletsText.textContent = "Copied All!";
+          copyAllBulletsBtn.classList.add("text-emerald-400", "border-emerald-500/60");
+          setTimeout(() => {
+            copyAllBulletsText.textContent = orig;
+            copyAllBulletsBtn.classList.remove("text-emerald-400", "border-emerald-500/60");
+          }, 2000);
+        });
+      });
     }
 
     // ── REAL LIVE AI ANALYSIS SUBMISSION ────────────────────────
