@@ -17,6 +17,7 @@ Run:
 import os
 import sys
 import json as _json
+from typing import Optional, List, Dict
 
 # Ensure UTF-8 output on Windows consoles to prevent cp1252 UnicodeEncodeError
 if hasattr(sys.stdout, "reconfigure"):
@@ -288,7 +289,7 @@ Job Description: {job.get('description', '')}"""
 
 # ── 6. ReAct-style Agent ─────────────────────────────────────────────────────
 class ResumeMatchingAgent:
-    """ReAct-style agent that evaluates candidate fit against a target job description."""
+    """ReAct-style agent that evaluates candidate fit against one or more target job descriptions."""
 
     def __init__(self, min_skills: int = 2):
         self.min_skills = min_skills
@@ -298,13 +299,26 @@ class ResumeMatchingAgent:
         self.trace.append(msg)
         print(msg)
 
-    def run(self, resume_text: str, custom_job: dict) -> dict:
-        if not custom_job:
+    def run(
+        self,
+        resume_text: str,
+        custom_job: Optional[dict] = None,
+        custom_jobs: Optional[List[dict]] = None,
+    ) -> dict:
+        # 1. Normalize target jobs list
+        jobs_to_process = []
+        if custom_jobs and isinstance(custom_jobs, list) and len(custom_jobs) > 0:
+            jobs_to_process = [j for j in custom_jobs if j and isinstance(j, dict)]
+        elif custom_job and isinstance(custom_job, dict):
+            jobs_to_process = [custom_job]
+
+        if not jobs_to_process:
             return {
                 "status": "error",
-                "message": "Please provide a job description (paste text or upload a screenshot) to match against.",
+                "message": "Please provide at least one job description (paste text or upload a screenshot) to match against.",
             }
 
+        # 2. Extract Candidate Profile (Single Pass)
         self.log("🧠 [Agent] Step 1: Extracting skills from resume...")
         profile = extract_skills(resume_text)
 
@@ -320,31 +334,74 @@ class ResumeMatchingAgent:
             }
 
         self.log(f"✅ [Agent] Extracted {len(profile['skills'])} skills: {profile['skills']}")
-        self.log(f"🎯 [Agent] Target Job Mode: Analyzing fit for '{custom_job.get('title')}' @ '{custom_job.get('company')}'...")
-        target_analysis = analyze_target_job(profile, custom_job)
-        self.log("✅ [Agent] Target job analysis complete. Compiling tailored report.")
+
+        # 3. Analyze each job description against the resume profile
+        ranked_jobs = []
+        total = len(jobs_to_process)
+        for idx, job in enumerate(jobs_to_process, 1):
+            title = job.get("title", "Target Role")
+            company = job.get("company", "Target Company")
+            self.log(f"🎯 [Agent] Analyzing job {idx}/{total}: '{title}' @ '{company}'...")
+            target_analysis = analyze_target_job(profile, job)
+            score = target_analysis.get("match_percentage", 0)
+            ranked_jobs.append({
+                "job": job,
+                "analysis": target_analysis,
+                "match_percentage": score,
+                "matching_skills_count": len(target_analysis.get("matching_skills", [])),
+                "missing_skills_count": len(target_analysis.get("missing_skills", [])),
+            })
+
+        # 4. Sort ranked jobs descending by match_percentage
+        ranked_jobs.sort(key=lambda x: x.get("match_percentage", 0), reverse=True)
+        best_match = ranked_jobs[0]
+        self.log(f"✅ [Agent] Analysis complete for {total} job(s). Top match: '{best_match['job'].get('title')}' ({best_match['match_percentage']}%).")
+
         return {
             "status": "ok",
-            "mode": "target_job",
+            "mode": "multi_job" if len(ranked_jobs) > 1 else "target_job",
             "profile": profile,
-            "job": custom_job,
-            "analysis": target_analysis,
+            "ranked_jobs": ranked_jobs,
+            "best_match": best_match,
+            "total_jobs": len(ranked_jobs),
+            # Backward-compatibility fields:
+            "job": best_match["job"],
+            "analysis": best_match["analysis"],
         }
 
 
 # ── 7. Report Generator ──────────────────────────────────────────────────────
 def generate_report(agent_output: dict) -> str:
-    """Generate Markdown report for Target Job Mode."""
+    """Generate Markdown report for Target Job or Multi-Job Mode."""
     if agent_output.get("status") != "ok":
         return f"### ⚠️ {agent_output.get('message', 'Could not generate a report.')}"
 
     profile = agent_output["profile"]
     candidate_name = profile.get("name") or "Candidate"
-    job = agent_output["job"]
-    analysis = agent_output["analysis"]
+    mode = agent_output.get("mode", "target_job")
+
+    lines = []
+    if mode == "multi_job":
+        ranked_jobs = agent_output.get("ranked_jobs", [])
+        lines.append(f"# 🏆 Multi-Job Match Leaderboard")
+        lines.append(f"**Candidate:** {candidate_name} | **Total Evaluated Roles:** {len(ranked_jobs)}\n")
+        lines.append("| Rank | Role / Company | Match % | Matching Skills | Missing Skills |")
+        lines.append("| :--- | :--- | :---: | :--- | :--- |")
+        for rank, item in enumerate(ranked_jobs, 1):
+            j = item["job"]
+            a = item["analysis"]
+            score = item["match_percentage"]
+            matching_preview = ", ".join(a.get("matching_skills", [])[:3]) or "None"
+            missing_preview = ", ".join(a.get("missing_skills", [])[:3]) or "None"
+            badge = "🥇 " if rank == 1 else ("🥈 " if rank == 2 else ("🥉 " if rank == 3 else f"#{rank} "))
+            lines.append(f"| {badge} | **{j.get('title')}**<br>*{j.get('company')}* | **{score}%** | {matching_preview} | {missing_preview} |")
+        lines.append("\n---\n")
+
+    job = agent_output.get("job", {})
+    analysis = agent_output.get("analysis", {})
     match_score = analysis.get("match_percentage", "N/A")
 
-    lines = [
+    lines.extend([
         f"# 🎯 Target Job Match Report: {job.get('title')} @ {job.get('company')}",
         f"**Candidate:** {candidate_name} | **Role:** {job.get('title')}\n",
         f"### 📊 Overall Match Score: **{match_score}%**",
@@ -356,7 +413,7 @@ def generate_report(agent_output: dict) -> str:
         f"- **🏷️ Key ATS Keywords to Include:** {', '.join(analysis.get('ats_keywords_to_add', [])) or 'None'}\n",
         "---",
         "## 📝 Actionable Resume Tailoring Suggestions",
-    ]
+    ])
 
     bullet_tips = analysis.get("resume_tailoring_tips", [])
     if bullet_tips:
@@ -524,7 +581,7 @@ with gr.Blocks(title="AI Resume Analyzer & Job Matching Agent") as demo:
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from typing import Optional
+from typing import Optional, List, Dict
 import uvicorn
 import tempfile
 import os
@@ -557,11 +614,14 @@ async def api_analyze(
     resume_text: str = Form(""),
     job_text: str = Form(""),
     job_image: Optional[UploadFile] = File(None),
+    jobs_payload: Optional[str] = Form(None),
+    job_images: Optional[List[UploadFile]] = File(None),
 ):
     """
     Unified API endpoint powering the Stitch UI:
       - Accepts PDF or raw text resumes
-      - Accepts target job text or screenshot image (EasyOCR)
+      - Accepts single target job (text or screenshot)
+      - Accepts multiple staged target jobs (mix of text and screenshots)
     """
     try:
         # 1. Extract Resume Text
@@ -591,40 +651,84 @@ async def api_analyze(
                 }
             )
 
-        # 2. Extract Job Description
-        custom_job = None
-        raw_job_text = ""
+        # 2. Extract Job Descriptions (Multi-Job or Single-Job)
+        all_jobs = []
 
-        if job_image is not None and getattr(job_image, "filename", None):
-            suffix = os.path.splitext(job_image.filename)[1] or ".png"
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                shutil.copyfileobj(job_image.file, tmp)
-                tmp_img_path = tmp.name
+        # Check if staged jobs payload was provided
+        if jobs_payload and jobs_payload.strip():
             try:
-                raw_job_text = extract_text_from_image(tmp_img_path)
-            finally:
+                staged_items = _json.loads(jobs_payload)
+                if isinstance(staged_items, list):
+                    # Cache uploaded images if job_images provided
+                    saved_image_paths = []
+                    if job_images:
+                        for img_upload in job_images:
+                            if getattr(img_upload, "filename", None):
+                                suffix = os.path.splitext(img_upload.filename)[1] or ".png"
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_img:
+                                    shutil.copyfileobj(img_upload.file, tmp_img)
+                                    saved_image_paths.append(tmp_img.name)
+
+                    try:
+                        for item in staged_items:
+                            item_type = item.get("type", "text")
+                            raw_content = ""
+                            if item_type == "text":
+                                raw_content = item.get("text", "").strip()
+                            elif item_type == "image":
+                                img_idx = item.get("image_index", 0)
+                                if 0 <= img_idx < len(saved_image_paths):
+                                    raw_content = extract_text_from_image(saved_image_paths[img_idx])
+
+                            if raw_content:
+                                parsed = parse_job_description(raw_content)
+                                if parsed:
+                                    all_jobs.append(parsed)
+                    finally:
+                        for p in saved_image_paths:
+                            try:
+                                os.remove(p)
+                            except Exception:
+                                pass
+            except Exception as pe:
+                print(f"Notice: failed to parse jobs_payload: {pe}")
+
+        # Fallback to single job inputs if no staged jobs
+        if not all_jobs:
+            raw_job_text = ""
+            if job_image is not None and getattr(job_image, "filename", None):
+                suffix = os.path.splitext(job_image.filename)[1] or ".png"
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    shutil.copyfileobj(job_image.file, tmp)
+                    tmp_img_path = tmp.name
                 try:
-                    os.remove(tmp_img_path)
-                except Exception:
-                    pass
+                    raw_job_text = extract_text_from_image(tmp_img_path)
+                finally:
+                    try:
+                        os.remove(tmp_img_path)
+                    except Exception:
+                        pass
 
-        if job_text and job_text.strip():
-            raw_job_text = job_text.strip()
+            if job_text and job_text.strip():
+                raw_job_text = job_text.strip()
 
-        if not raw_job_text.strip():
+            if raw_job_text.strip():
+                single_parsed = parse_job_description(raw_job_text)
+                if single_parsed:
+                    all_jobs.append(single_parsed)
+
+        if not all_jobs:
             return JSONResponse(
                 status_code=400,
                 content={
                     "status": "error",
-                    "message": "Please paste a job description or upload a screenshot to match against."
+                    "message": "Please add or paste at least one job description or screenshot to match against."
                 }
             )
 
-        custom_job = parse_job_description(raw_job_text)
-
-        # 3. Run Agent Pipeline
+        # 3. Run Agent Pipeline (single profile extraction, multi-job evaluation)
         agent = ResumeMatchingAgent()
-        output = agent.run(extracted_resume, custom_job=custom_job)
+        output = agent.run(extracted_resume, custom_jobs=all_jobs)
 
         if output.get("status") != "ok":
             return JSONResponse(

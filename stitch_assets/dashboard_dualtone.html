@@ -366,6 +366,34 @@
   </div>
 </div>
 
+  <!-- Add to Comparison Queue Row -->
+  <div class="flex items-center justify-between pt-1">
+    <button type="button" id="addJobToListBtn" class="py-2 px-3.5 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer">
+      <span class="material-symbols-outlined text-[16px] text-amber-400">playlist_add</span>
+      <span>+ Add Role to Comparison Queue</span>
+    </button>
+    <span id="stagedCountPill" class="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60">
+      0 Roles Queued
+    </span>
+  </div>
+
+  <!-- Staged Jobs Container -->
+  <div id="stagedJobsContainer" class="hidden flex-col gap-2 p-3 bg-slate-50/90 rounded-xl border border-slate-200/80">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[16px] text-slate-700">view_list</span>
+        <span class="text-xs font-bold text-slate-900">Queued Target Roles</span>
+        <span id="stagedJobsCounterBadge" class="px-1.5 py-0.2 bg-slate-200 text-slate-800 rounded-full text-[10px] font-bold">0</span>
+      </div>
+      <button type="button" id="clearAllStagedBtn" class="text-[10px] text-rose-600 hover:text-rose-700 font-semibold cursor-pointer">
+        Clear Queue
+      </button>
+    </div>
+    <div id="stagedJobsList" class="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
+      <!-- Staged job items will appear here -->
+    </div>
+  </div>
+
 </div>
 <!-- Card C: Primary CTA Buttons -->
 <div class="flex flex-col sm:flex-row items-center gap-3 pt-1">
@@ -412,6 +440,27 @@
 <span class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-mono">
   Live Telemetry
 </span>
+</div>
+
+<!-- Multi-Role Fit Leaderboard Card (Displayed when multiple roles are evaluated) -->
+<div id="multiJobLeaderboardCard" class="hidden bg-[#2b3036] rounded-2xl p-4 sm:p-5 border border-amber-500/40 shadow-dark-subtle flex-col gap-3">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+        <span class="material-symbols-outlined text-[17px]">leaderboard</span>
+      </div>
+      <div>
+        <h3 class="text-xs sm:text-sm font-bold text-white">Multi-Role Compatibility Leaderboard</h3>
+        <p class="text-[10px] text-slate-400">Ranked by Groq LPU • Click any role to inspect detailed breakdown</p>
+      </div>
+    </div>
+    <span id="leaderboardRolesCount" class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+      0 Roles
+    </span>
+  </div>
+  <div id="leaderboardList" class="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1 dark-scrollbar">
+    <!-- Populated dynamically with ranked role cards -->
+  </div>
 </div>
 
 <!-- Match Score Radial / Spectrum Gauge Card (Like BMI Gauge Card in Image 4) -->
@@ -786,45 +835,327 @@
       }
     });
 
-    // Reset Inputs
-    const clearAllInputsBtn = document.getElementById('clearAllInputsBtn');
+    // ── STAGED JOBS QUEUE MANAGEMENT ───────────────────────────
+    let currentAnalysisResponse = null;
+    let stagedJobs = []; // Array of { type: 'text'|'image', title: string, content: string|File }
+
+    const addJobToListBtn = document.getElementById('addJobToListBtn');
+    const stagedJobsContainer = document.getElementById('stagedJobsContainer');
+    const stagedJobsList = document.getElementById('stagedJobsList');
+    const stagedCountPill = document.getElementById('stagedCountPill');
+    const stagedJobsCounterBadge = document.getElementById('stagedJobsCounterBadge');
+    const clearAllStagedBtn = document.getElementById('clearAllStagedBtn');
     const rawResumeText = document.getElementById('rawResumeText');
     const jobDescriptionInput = document.getElementById('jobDescriptionInput');
+    const clearAllInputsBtn = document.getElementById('clearAllInputsBtn');
+    const runAnalysisBtn = document.getElementById('runAnalysisBtn');
+    const btnText = document.getElementById('btnText');
 
+    function updateStagedUI() {
+      const count = stagedJobs.length;
+      stagedCountPill.textContent = `${count} Role${count === 1 ? '' : 's'} Queued`;
+      stagedJobsCounterBadge.textContent = count;
+
+      if (count === 0) {
+        stagedJobsContainer.classList.add('hidden');
+        stagedJobsContainer.classList.remove('flex');
+        btnText.textContent = 'Analyze Resume & Match Job';
+      } else {
+        stagedJobsContainer.classList.remove('hidden');
+        stagedJobsContainer.classList.add('flex');
+        btnText.textContent = `Analyze & Compare (${count}) Roles`;
+
+        stagedJobsList.innerHTML = stagedJobs.map((j, idx) => `
+          <div class="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 shadow-2xs hover:border-slate-300 transition-all">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <div class="w-6 h-6 rounded-md ${j.type === 'text' ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-700'} flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[14px]">${j.type === 'text' ? 'description' : 'image'}</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-bold text-slate-800 truncate">${j.title}</p>
+                <p class="text-[10px] text-slate-400 font-mono">${j.type === 'text' ? 'Pasted Text' : 'Screenshot (EasyOCR)'}</p>
+              </div>
+            </div>
+            <button type="button" onclick="removeStagedJob(${idx})" class="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors cursor-pointer" title="Remove Role">
+              <span class="material-symbols-outlined text-[15px]">close</span>
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+
+    window.removeStagedJob = function(idx) {
+      stagedJobs.splice(idx, 1);
+      updateStagedUI();
+    };
+
+    addJobToListBtn.addEventListener('click', () => {
+      if (activeTab === 'A') {
+        const text = (jobDescriptionInput.value || '').trim();
+        if (!text) {
+          alert("Please enter or paste a job description first before adding it to the queue.");
+          return;
+        }
+        const firstLine = text.split('\n')[0].replace(/^[#*\-•\s]+/, '').trim().slice(0, 45) || `Job Role #${stagedJobs.length + 1}`;
+        stagedJobs.push({
+          type: 'text',
+          title: firstLine,
+          content: text
+        });
+        jobDescriptionInput.value = '';
+        updateStagedUI();
+      } else if (activeTab === 'B') {
+        const img = (jobScreenshotInput.files && jobScreenshotInput.files[0]) || currentScreenshotFile;
+        if (!img) {
+          alert("Please upload or paste a screenshot first before adding it to the queue.");
+          return;
+        }
+        stagedJobs.push({
+          type: 'image',
+          title: img.name || `Screenshot Role #${stagedJobs.length + 1}`,
+          content: img
+        });
+        clearScreenshot();
+        updateStagedUI();
+      }
+    });
+
+    clearAllStagedBtn.addEventListener('click', () => {
+      stagedJobs = [];
+      updateStagedUI();
+    });
+
+    // Reset Inputs
     clearAllInputsBtn.addEventListener('click', () => {
       rawResumeText.value = '';
       jobDescriptionInput.value = '';
       clearResumeFile();
       clearScreenshot();
+      stagedJobs = [];
+      updateStagedUI();
+      currentAnalysisResponse = null;
+      const card = document.getElementById('multiJobLeaderboardCard');
+      if (card) {
+        card.classList.add('hidden');
+        card.classList.remove('flex');
+      }
     });
 
-    // REAL LIVE AI ANALYSIS SUBMISSION
-    const runAnalysisBtn = document.getElementById('runAnalysisBtn');
-    const btnText = document.getElementById('btnText');
+    // ── LEADERBOARD & TELEMETRY RENDERING ───────────────────────
+    function renderLeaderboard(rankedJobs, activeIndex = 0) {
+      const card = document.getElementById('multiJobLeaderboardCard');
+      const list = document.getElementById('leaderboardList');
+      const countBadge = document.getElementById('leaderboardRolesCount');
 
+      if (!rankedJobs || rankedJobs.length <= 1) {
+        card.classList.add('hidden');
+        card.classList.remove('flex');
+        return;
+      }
+
+      card.classList.remove('hidden');
+      card.classList.add('flex');
+      countBadge.textContent = `${rankedJobs.length} Roles Evaluated`;
+
+      list.innerHTML = rankedJobs.map((item, idx) => {
+        const isSelected = (idx === activeIndex);
+        const score = item.match_percentage || 0;
+        const scoreColor = score >= 80 ? 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30' : (score >= 60 ? 'text-amber-400 bg-amber-500/20 border-amber-500/30' : 'text-rose-400 bg-rose-500/20 border-rose-500/30');
+        const rankLabel = idx === 0 ? '👑 #1 Top Match' : `#${idx + 1}`;
+        const rankBg = idx === 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-700/60 text-slate-300 border border-slate-600';
+
+        return `
+          <div onclick="selectLeaderboardRole(${idx})" class="p-3 rounded-xl cursor-pointer transition-all border ${isSelected ? 'bg-[#1e2227] border-cyan-400/90 shadow-md ring-1 ring-cyan-400/50' : 'bg-[#212529] border-slate-700/70 hover:border-slate-500'} flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${rankBg} shrink-0">
+                  ${rankLabel}
+                </span>
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-white truncate">${item.job.title || 'Target Role'}</p>
+                  <p class="text-[10px] text-slate-400 truncate">${item.job.company || 'Target Company'}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span class="px-2 py-0.5 rounded-md text-xs font-bold border ${scoreColor}">
+                  ${score}%
+                </span>
+                ${isSelected ? '<span class="text-cyan-400 text-[10px] font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-[13px]">visibility</span> Active</span>' : '<span class="text-slate-400 hover:text-white text-[10px] font-medium">Select →</span>'}
+              </div>
+            </div>
+            <!-- Mini progress bar -->
+            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div class="h-1.5 rounded-full ${score >= 80 ? 'bg-emerald-500' : (score >= 60 ? 'bg-amber-500' : 'bg-rose-500')}" style="width: ${score}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.selectLeaderboardRole = function(idx) {
+      if (!currentAnalysisResponse || !currentAnalysisResponse.ranked_jobs) return;
+      const targetItem = currentAnalysisResponse.ranked_jobs[idx];
+      if (!targetItem) return;
+
+      renderLeaderboard(currentAnalysisResponse.ranked_jobs, idx);
+      renderJobTelemetry(targetItem.job, targetItem.analysis, idx, currentAnalysisResponse.ranked_jobs.length);
+    };
+
+    function renderJobTelemetry(job, analysis, rankIndex = 0, totalCount = 1) {
+      if (!job || !analysis) return;
+
+      // 1. Role Title & Subtitle
+      document.getElementById("targetRoleTitle").textContent = job.title || 'Target Role';
+      document.getElementById("targetRoleSub").textContent = `${job.company || 'Company'} • ${job.description ? job.description.slice(0, 50) + '...' : 'Target Spec'}`;
+      document.getElementById("targetRoleTier").textContent = totalCount > 1 ? `Rank #${rankIndex + 1} of ${totalCount}` : 'Target Role Fit';
+
+      // 2. Scores
+      const score = (analysis.match_percentage !== undefined) ? analysis.match_percentage : 75;
+
+      document.getElementById("cmiScorePercent").textContent = `${score}.0%`;
+      document.getElementById("atsReadinessScore").textContent = `${score}%`;
+      document.getElementById("fitProbabilityScore").textContent = `${Math.min(99, score + 10)}%`;
+
+      const pin = document.getElementById("spectrumPin");
+      if (pin) {
+        pin.style.left = `${Math.max(5, Math.min(95, score))}%`;
+      }
+      const pinDot = document.getElementById("spectrumPinDot");
+      if (pinDot) {
+        pinDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+      }
+
+      const cmiBadge = document.getElementById("cmiBadge");
+      if (cmiBadge) {
+        if (score >= 80) {
+          cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30';
+          cmiBadge.textContent = 'High Compatibility';
+        } else if (score >= 60) {
+          cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-[10px] font-bold border border-amber-500/30';
+          cmiBadge.textContent = 'Moderate Alignment';
+        } else {
+          cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[10px] font-bold border border-rose-500/30';
+          cmiBadge.textContent = 'Significant Gaps';
+        }
+      }
+
+      const atsBadge = document.getElementById("atsReadinessBadge");
+      if (atsBadge) {
+        atsBadge.className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold';
+        atsBadge.textContent = score >= 75 ? 'ATS Optimized' : 'Needs Optimization';
+      }
+
+      const fitBadge = document.getElementById("fitProbabilityBadge");
+      if (fitBadge) {
+        fitBadge.className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 text-[10px] font-semibold';
+        fitBadge.textContent = score >= 80 ? 'High Tier Candidate' : 'Mid Tier Candidate';
+      }
+
+      // 3. Recruiter Verdict
+      const verdict = analysis.verdict_summary || 'Candidate evaluated against job description.';
+      document.getElementById("recruiterVerdictText").textContent = `“${verdict}”`;
+
+      // 4. Skills Breakdown
+      const matching = analysis.matching_skills || [];
+      const missing = analysis.missing_skills || [];
+
+      const totalSkills = matching.length + missing.length;
+      document.getElementById("matchedSkillsCountTop").textContent = matching.length;
+      document.getElementById("totalSkillsCountTop").textContent = `of ${totalSkills} Matched`;
+      document.getElementById("coreMatchPercentTop").textContent = `${score}% Match`;
+      document.getElementById("coreMatchPercentTop").className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold';
+
+      const skillsTracked = document.getElementById("skillsTrackedCount");
+      if (skillsTracked) skillsTracked.textContent = `${totalSkills} Skills Tracked`;
+
+      const matchBox = document.getElementById("matchingSkillsContainer");
+      if (matchBox) {
+        matchBox.innerHTML = matching.map(s => `
+          <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-[11px] font-semibold border border-emerald-500/25 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ${s}
+          </span>
+        `).join('') || '<span class="text-xs text-slate-400">None detected</span>';
+      }
+
+      const missBox = document.getElementById("missingSkillsContainer");
+      if (missBox) {
+        missBox.innerHTML = missing.map(s => `
+          <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 text-[11px] font-semibold border border-rose-500/30 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> ${s}
+          </span>
+        `).join('') || '<span class="text-xs text-emerald-400">None! You meet all listed requirements.</span>';
+      }
+
+      // 5. Learning Fast-Track
+      const learning = analysis.learning_suggestions || [];
+      const learnBox = document.getElementById("learningRoadmapContainer");
+      const hoursBox = document.getElementById("upskillingTotalHours");
+      if (hoursBox) hoursBox.textContent = `${learning.length} High-Impact Action${learning.length === 1 ? '' : 's'}`;
+
+      if (learnBox && learning.length > 0) {
+        learnBox.innerHTML = learning.map((item, i) => `
+          <div class="p-3.5 rounded-xl bg-[#212529] hover:bg-[#1e2227] transition-all border border-slate-700/70 flex items-start justify-between gap-3 shadow-sm">
+            <div class="flex items-start gap-3 min-w-0 flex-1">
+              <div class="w-7 h-7 rounded-lg ${i % 2 === 0 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'} flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                <span class="material-symbols-outlined text-[15px]">${i % 2 === 0 ? 'bolt' : 'school'}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-slate-100 leading-relaxed whitespace-normal break-words">${item}</p>
+                <p class="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1.5 font-medium">
+                  <span class="w-1.5 h-1.5 rounded-full ${i % 2 === 0 ? 'bg-cyan-400' : 'bg-amber-400'}"></span>
+                  Recommended Action to Close Gap
+                </p>
+              </div>
+            </div>
+            <span class="text-[10px] font-bold text-cyan-400 bg-[#2b3036] border border-slate-700 px-2.5 py-1 rounded-md shrink-0 self-start">
+              Step ${i + 1}
+            </span>
+          </div>
+        `).join('');
+      } else if (learnBox) {
+        learnBox.innerHTML = '<div class="p-3.5 rounded-xl bg-[#212529] text-xs text-emerald-400 text-center border border-emerald-900/40">No critical skill gaps identified! You meet all listed requirements.</div>';
+      }
+    }
+
+    // ── REAL LIVE AI ANALYSIS SUBMISSION ────────────────────────
     runAnalysisBtn.addEventListener('click', async () => {
       const resumeFile = resumeFileInput.files && resumeFileInput.files[0];
       const resumeText = (rawResumeText.value || '').trim();
-      const jobText = (jobDescriptionInput.value || '').trim();
-      const jobImage = (jobScreenshotInput.files && jobScreenshotInput.files[0]) || currentScreenshotFile;
 
       if (!resumeFile && !resumeText) {
         alert("Please provide a resume! Upload a PDF or paste your resume text in the box.");
         return;
       }
 
-      if (activeTab === 'A' && !jobText) {
-        alert("Please paste the job description text to match against.");
-        return;
-      }
+      // Check current inputs to see if un-staged job can be added
+      const currentText = (jobDescriptionInput.value || '').trim();
+      const currentImg = (jobScreenshotInput.files && jobScreenshotInput.files[0]) || currentScreenshotFile;
 
-      if (activeTab === 'B' && !jobImage) {
-        alert("Please upload or drop a screenshot of the job posting.");
-        return;
+      if (stagedJobs.length === 0) {
+        if (activeTab === 'A' && !currentText) {
+          alert("Please paste a job description or add jobs to the queue to match against.");
+          return;
+        }
+        if (activeTab === 'B' && !currentImg) {
+          alert("Please upload or paste a screenshot of the job posting.");
+          return;
+        }
+      } else {
+        // If user queued jobs AND also left something in the active tab, auto-stage it
+        if (activeTab === 'A' && currentText) {
+          const firstLine = currentText.split('\n')[0].replace(/^[#*\-•\s]+/, '').trim().slice(0, 45) || `Job Role #${stagedJobs.length + 1}`;
+          stagedJobs.push({ type: 'text', title: firstLine, content: currentText });
+          jobDescriptionInput.value = '';
+          updateStagedUI();
+        } else if (activeTab === 'B' && currentImg) {
+          stagedJobs.push({ type: 'image', title: currentImg.name || `Screenshot Role #${stagedJobs.length + 1}`, content: currentImg });
+          clearScreenshot();
+          updateStagedUI();
+        }
       }
 
       const original = btnText.textContent;
-      btnText.textContent = 'Analyzing with Groq LPU...';
+      btnText.textContent = stagedJobs.length > 1 ? `Analyzing ${stagedJobs.length} Roles with Groq LPU...` : 'Analyzing with Groq LPU...';
       runAnalysisBtn.classList.add('opacity-80', 'animate-pulse');
 
       try {
@@ -834,10 +1165,27 @@
         }
         formData.append("resume_text", resumeText);
 
-        if (activeTab === 'A') {
-          formData.append("job_text", jobText);
-        } else if (activeTab === 'B' && jobImage) {
-          formData.append("job_image", jobImage);
+        if (stagedJobs.length > 0) {
+          // Multi-job payload
+          const payload = [];
+          let imgIndex = 0;
+          for (const sj of stagedJobs) {
+            if (sj.type === 'text') {
+              payload.push({ type: 'text', text: sj.content });
+            } else if (sj.type === 'image') {
+              payload.push({ type: 'image', image_index: imgIndex });
+              formData.append("job_images", sj.content);
+              imgIndex++;
+            }
+          }
+          formData.append("jobs_payload", JSON.stringify(payload));
+        } else {
+          // Single-job fallback
+          if (activeTab === 'A') {
+            formData.append("job_text", currentText);
+          } else if (activeTab === 'B' && currentImg) {
+            formData.append("job_image", currentImg);
+          }
         }
 
         const res = await fetch("/api/analyze", {
@@ -851,120 +1199,22 @@
           return;
         }
 
-        // 1. Role Title & Subtitle
-        if (data.job) {
-          document.getElementById("targetRoleTitle").textContent = data.job.title || 'Target Role';
-          document.getElementById("targetRoleSub").textContent = `${data.job.company || 'Company'} • ${data.job.description ? data.job.description.slice(0, 45) + '...' : 'Target Spec'}`;
-          document.getElementById("targetRoleTier").textContent = 'Target Role Fit';
-        }
+        currentAnalysisResponse = data;
 
-        // 2. Scores
-        const score = (data.analysis && data.analysis.match_percentage !== undefined)
-          ? data.analysis.match_percentage
-          : 75;
-
-        document.getElementById("cmiScorePercent").textContent = `${score}.0%`;
-        document.getElementById("atsReadinessScore").textContent = `${score}%`;
-        document.getElementById("fitProbabilityScore").textContent = `${Math.min(99, score + 10)}%`;
-
-        const pin = document.getElementById("spectrumPin");
-        if (pin) {
-          pin.style.left = `${Math.max(5, Math.min(95, score))}%`;
-        }
-        const pinDot = document.getElementById("spectrumPinDot");
-        if (pinDot) {
-          pinDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
-        }
-
-        const cmiBadge = document.getElementById("cmiBadge");
-        if (cmiBadge) {
-          if (score >= 80) {
-            cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30';
-            cmiBadge.textContent = 'High Compatibility';
-          } else if (score >= 60) {
-            cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 text-[10px] font-bold border border-amber-500/30';
-            cmiBadge.textContent = 'Moderate Alignment';
-          } else {
-            cmiBadge.className = 'px-2.5 py-0.5 rounded-md bg-rose-500/20 text-rose-400 text-[10px] font-bold border border-rose-500/30';
-            cmiBadge.textContent = 'Significant Gaps';
-          }
-        }
-
-        const atsBadge = document.getElementById("atsReadinessBadge");
-        if (atsBadge) {
-          atsBadge.className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold';
-          atsBadge.textContent = score >= 75 ? 'ATS Optimized' : 'Needs Optimization';
-        }
-
-        const fitBadge = document.getElementById("fitProbabilityBadge");
-        if (fitBadge) {
-          fitBadge.className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 text-[10px] font-semibold';
-          fitBadge.textContent = score >= 80 ? 'High Tier Candidate' : 'Mid Tier Candidate';
-        }
-
-        // 3. Recruiter Verdict
-        const verdict = (data.analysis && data.analysis.verdict_summary) || 'Candidate evaluated against job description.';
-        document.getElementById("recruiterVerdictText").textContent = `“${verdict}”`;
-
-        // 4. Skills Breakdown
-        const matching = (data.analysis && data.analysis.matching_skills) || [];
-        const missing = (data.analysis && data.analysis.missing_skills) || [];
-
-        const totalSkills = matching.length + missing.length;
-        document.getElementById("matchedSkillsCountTop").textContent = matching.length;
-        document.getElementById("totalSkillsCountTop").textContent = `of ${totalSkills} Matched`;
-        document.getElementById("coreMatchPercentTop").textContent = `${score}% Match`;
-        document.getElementById("coreMatchPercentTop").className = 'inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold';
-
-        const skillsTracked = document.getElementById("skillsTrackedCount");
-        if (skillsTracked) skillsTracked.textContent = `${totalSkills} Skills Tracked`;
-
-        const matchBox = document.getElementById("matchingSkillsContainer");
-        if (matchBox) {
-          matchBox.innerHTML = matching.map(s => `
-            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-[11px] font-semibold border border-emerald-500/25 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ${s}
-            </span>
-          `).join('') || '<span class="text-xs text-slate-400">None detected</span>';
-        }
-
-        const missBox = document.getElementById("missingSkillsContainer");
-        if (missBox) {
-          missBox.innerHTML = missing.map(s => `
-            <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 text-[11px] font-semibold border border-rose-500/30 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> ${s}
-            </span>
-          `).join('') || '<span class="text-xs text-emerald-400">None! You meet all listed requirements.</span>';
-        }
-
-        // 5. Learning Fast-Track
-        const learning = (data.analysis && data.analysis.learning_suggestions) || [];
-        const learnBox = document.getElementById("learningRoadmapContainer");
-        const hoursBox = document.getElementById("upskillingTotalHours");
-        if (hoursBox) hoursBox.textContent = `${learning.length} High-Impact Action${learning.length === 1 ? '' : 's'}`;
-
-        if (learnBox && learning.length > 0) {
-          learnBox.innerHTML = learning.map((item, i) => `
-            <div class="p-3.5 rounded-xl bg-[#212529] hover:bg-[#1e2227] transition-all border border-slate-700/70 flex items-start justify-between gap-3 shadow-sm">
-              <div class="flex items-start gap-3 min-w-0 flex-1">
-                <div class="w-7 h-7 rounded-lg ${i % 2 === 0 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'} flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                  <span class="material-symbols-outlined text-[15px]">${i % 2 === 0 ? 'bolt' : 'school'}</span>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold text-slate-100 leading-relaxed whitespace-normal break-words">${item}</p>
-                  <p class="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1.5 font-medium">
-                    <span class="w-1.5 h-1.5 rounded-full ${i % 2 === 0 ? 'bg-cyan-400' : 'bg-amber-400'}"></span>
-                    Recommended Action to Close Gap
-                  </p>
-                </div>
-              </div>
-              <span class="text-[10px] font-bold text-cyan-400 bg-[#2b3036] border border-slate-700 px-2.5 py-1 rounded-md shrink-0 self-start">
-                Step ${i + 1}
-              </span>
-            </div>
-          `).join('');
-        } else if (learnBox) {
-          learnBox.innerHTML = '<div class="p-3.5 rounded-xl bg-[#212529] text-xs text-emerald-400 text-center border border-emerald-900/40">No critical skill gaps identified! You meet all listed requirements.</div>';
+        if (data.ranked_jobs && data.ranked_jobs.length > 1) {
+          // Multiple roles: render leaderboard and default to #1 top fit
+          renderLeaderboard(data.ranked_jobs, 0);
+          renderJobTelemetry(data.ranked_jobs[0].job, data.ranked_jobs[0].analysis, 0, data.ranked_jobs.length);
+        } else if (data.ranked_jobs && data.ranked_jobs.length === 1) {
+          // Single role inside ranked_jobs
+          const card = document.getElementById('multiJobLeaderboardCard');
+          if (card) { card.classList.add('hidden'); card.classList.remove('flex'); }
+          renderJobTelemetry(data.ranked_jobs[0].job, data.ranked_jobs[0].analysis, 0, 1);
+        } else {
+          // Legacy single-job payload
+          const card = document.getElementById('multiJobLeaderboardCard');
+          if (card) { card.classList.add('hidden'); card.classList.remove('flex'); }
+          renderJobTelemetry(data.job, data.analysis, 0, 1);
         }
 
       } catch (err) {
