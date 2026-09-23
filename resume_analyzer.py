@@ -25,59 +25,60 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-# Always load from .env first so new keys override stale terminal environment variables
+# Always load from .env first if present (for local runs)
 if os.path.exists(".env"):
-    with open(".env", "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("GROQ_API_KEY="):
-                val = line.split("=", 1)[1].strip().strip('"\'')
-                if val:
-                    os.environ["GROQ_API_KEY"] = val
-            elif line.startswith("GROQ_MODEL="):
-                val = line.split("=", 1)[1].strip().strip('"\'')
-                if val:
-                    os.environ["GROQ_MODEL"] = val
+    try:
+        with open(".env", "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("GROQ_API_KEY="):
+                    val = line.split("=", 1)[1].strip().strip('"\'')
+                    if val and not os.environ.get("GROQ_API_KEY"):
+                        os.environ["GROQ_API_KEY"] = val
+                elif line.startswith("GROQ_MODEL="):
+                    val = line.split("=", 1)[1].strip().strip('"\'')
+                    if val and not os.environ.get("GROQ_MODEL"):
+                        os.environ["GROQ_MODEL"] = val
+    except Exception:
+        pass
 
+# Only prompt for API key if running interactively in terminal and no key is set
 if not os.environ.get("GROQ_API_KEY"):
-    os.environ["GROQ_API_KEY"] = input("Enter your Groq API key: ").strip()
+    if sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+        try:
+            os.environ["GROQ_API_KEY"] = input("Enter your Groq API key: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            pass
 
-_key = os.environ["GROQ_API_KEY"]
-print(f"Loaded Groq API key: {_key[:8]}...{_key[-4:] if len(_key) > 12 else ''}")
+_key = os.environ.get("GROQ_API_KEY", "")
+if _key:
+    print(f"Loaded Groq API key: {_key[:8]}...{_key[-4:] if len(_key) > 12 else ''}")
+else:
+    print("Notice: GROQ_API_KEY not yet detected. Provide it via environment variable in Vercel or in .env.")
 
 from groq import Groq
-
-client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 # Model choice — openai/gpt-oss-120b is available and tested on this Groq account.
 MODEL_NAME = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
-# Validate the API key immediately on startup so the user gets instant feedback
-try:
-    client.models.list()
-    print(f"✅ Groq API key verified successfully! Using model: {MODEL_NAME}")
-except Exception as _auth_err:
-    err_msg = str(_auth_err)
-    if "401" in err_msg or "invalid_api_key" in err_msg.lower():
-        print("\n" + "=" * 65)
-        print("❌ [GROQ AUTHENTICATION FAILED - 401 Invalid API Key]")
-        print("=" * 65)
-        print("The Groq API key in your .env file is invalid or was revoked.")
-        print("Steps to resolve:")
-        print("  1. Go to https://console.groq.com/keys")
-        print("  2. Create a new API key (starts with 'gsk_')")
-        print("  3. Paste it into your .env file:")
-        print("       GROQ_API_KEY=gsk_your_new_key_here")
-        print("  4. Save .env and re-run python resume_analyzer.py")
-        print("=" * 65 + "\n")
-        sys.exit(1)
-    else:
-        print(f"⚠️ [Groq Warning]: {_auth_err}")
+_groq_client: Optional[Groq] = None
+
+
+def get_groq_client() -> Groq:
+    """Lazy initialize and return the Groq client instance."""
+    global _groq_client
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("GROQ_API_KEY environment variable is not set. Please add it to your Vercel Project Settings > Environment Variables.")
+    if _groq_client is None:
+        _groq_client = Groq(api_key=api_key)
+    return _groq_client
 
 
 def call_llm(system_prompt: str, user_prompt: str,
              json_mode: bool = False, temperature: float = 0.2) -> str:
     """Thin wrapper around the Groq chat completion endpoint."""
+    client = get_groq_client()
     kwargs = {}
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
@@ -94,16 +95,32 @@ def call_llm(system_prompt: str, user_prompt: str,
 
 
 # ── 2. PDF Resume Parser ─────────────────────────────────────────────────────
-import pdfplumber
-
-
 def parse_resume_pdf(file_path: str) -> str:
-    """Extract raw text from a PDF resume."""
+    """Extract raw text from a PDF resume using pypdf or pdfplumber."""
     text_parts = []
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            page_text = page.extract_text() or ""
-            text_parts.append(page_text)
+    # 1. Try pypdf (lightweight pure-python parser, fast and zero-binary)
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(file_path)
+        for page in reader.pages:
+            t = page.extract_text() or ""
+            if t:
+                text_parts.append(t)
+    except Exception:
+        pass
+
+    # 2. Fallback to pdfplumber if pypdf extracted nothing
+    if not text_parts:
+        try:
+            import pdfplumber
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    t = page.extract_text() or ""
+                    if t:
+                        text_parts.append(t)
+        except Exception:
+            pass
+
     return "\n".join(text_parts).strip()
 
 
@@ -112,22 +129,29 @@ _ocr_reader = None
 
 
 def get_ocr_reader():
-    """Lazy-load the EasyOCR reader so startup remains instantaneous."""
+    """Lazy-load EasyOCR if available (optional for local runs, bypassed on serverless)."""
     global _ocr_reader
     if _ocr_reader is None:
-        print("🔍 Initializing OCR reader for image text extraction...")
-        import easyocr
-        _ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
-    return _ocr_reader
+        try:
+            import easyocr
+            print("🔍 Initializing OCR reader for image text extraction...")
+            _ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+        except Exception as _ocr_err:
+            print(f"Notice: EasyOCR not available ({_ocr_err}). Screenshots require pasted text or a dedicated container.")
+            _ocr_reader = False
+    return _ocr_reader if _ocr_reader is not False else None
 
 
 def extract_text_from_image(image_input) -> str:
-    """Extract raw text from a screenshot or image file using EasyOCR."""
+    """Extract raw text from a screenshot or image file using EasyOCR if available."""
     if image_input is None:
         return ""
     try:
         reader = get_ocr_reader()
-        # image_input can be a string filepath or a numpy array/PIL image from Gradio
+        if not reader:
+            print("Notice: OCR reader not available in this environment.")
+            return ""
+        # image_input can be a string filepath or a numpy array/PIL image
         results = reader.readtext(image_input, detail=0)
         extracted = "\n".join(results).strip()
         print(f"✅ OCR extracted {len(extracted)} characters from image.")
@@ -546,79 +570,85 @@ def run_pipeline(resume_file, resume_pasted_text, job_pasted_text, job_image_fil
         return f"### ⚠️ An error occurred during analysis:\n\n`{err_str}`", {}
 
 
-# ── 9. Modern Gradio Interface ──────────────────────────────────────────────
-import gradio as gr
+# ── 9. Gradio Interface (Optional / Local Fallback) ─────────────────────────
+demo = None
+gr = None
+try:
+    import gradio as gr
 
-custom_css = """
-.main-title { text-align: center; margin-bottom: 8px; font-weight: 700; }
-.sub-title { text-align: center; color: #888; margin-bottom: 24px; }
-"""
+    custom_css = """
+    .main-title { text-align: center; margin-bottom: 8px; font-weight: 700; }
+    .sub-title { text-align: center; color: #888; margin-bottom: 24px; }
+    """
 
-with gr.Blocks(title="AI Resume Analyzer & Job Matching Agent") as demo:
-    gr.Markdown("# 🚀 AI Resume Analyzer & Job Matching Agent", elem_classes=["main-title"])
-    gr.Markdown(
-        "Upload your resume and match it against **any target Job Description** (pasted text or screenshot).",
-        elem_classes=["sub-title"],
-    )
+    with gr.Blocks(title="AI Resume Analyzer & Job Matching Agent") as demo:
+        gr.Markdown("# 🚀 AI Resume Analyzer & Job Matching Agent", elem_classes=["main-title"])
+        gr.Markdown(
+            "Upload your resume and match it against **any target Job Description** (pasted text or screenshot).",
+            elem_classes=["sub-title"],
+        )
 
-    with gr.Row():
-        # ── Left Column: Inputs ──
-        with gr.Column(scale=1):
-            gr.Markdown("### 📄 1. Your Resume")
-            resume_file_input = gr.File(
-                label="Upload Resume (PDF)",
-                file_types=[".pdf"],
-            )
-            with gr.Accordion("Or paste resume text directly", open=False):
-                resume_text_input = gr.Textbox(
-                    label="Pasted Resume Text",
-                    placeholder="Paste your raw resume text here if you don't have a PDF...",
-                    lines=6,
+        with gr.Row():
+            # ── Left Column: Inputs ──
+            with gr.Column(scale=1):
+                gr.Markdown("### 📄 1. Your Resume")
+                resume_file_input = gr.File(
+                    label="Upload Resume (PDF)",
+                    file_types=[".pdf"],
                 )
-
-            gr.Markdown("### 🎯 2. Target Job Description")
-            with gr.Tabs():
-                with gr.Tab("📋 Paste Job Description"):
-                    job_text_input = gr.Textbox(
-                        label="Job Posting Text",
-                        placeholder="Paste the job title, requirements, or full posting from LinkedIn, Indeed, etc...",
-                        lines=7,
+                with gr.Accordion("Or paste resume text directly", open=False):
+                    resume_text_input = gr.Textbox(
+                        label="Pasted Resume Text",
+                        placeholder="Paste your raw resume text here if you don't have a PDF...",
+                        lines=6,
                     )
-                with gr.Tab("🖼️ Upload Job Screenshot"):
-                    job_image_input = gr.Image(
-                        label="Screenshot of Job Posting (PNG, JPG)",
-                        type="filepath",
-                    )
-                    gr.Markdown("💡 *Takes a screenshot from LinkedIn or job boards. EasyOCR extracts the requirements automatically.*")
 
-            with gr.Row():
-                submit_btn = gr.Button("🚀 Analyze & Match", variant="primary", size="lg")
-                clear_btn = gr.Button("🔄 Clear All", size="lg")
+                gr.Markdown("### 🎯 2. Target Job Description")
+                with gr.Tabs():
+                    with gr.Tab("📋 Paste Job Description"):
+                        job_text_input = gr.Textbox(
+                            label="Job Posting Text",
+                            placeholder="Paste the job title, requirements, or full posting from LinkedIn, Indeed, etc...",
+                            lines=7,
+                        )
+                    with gr.Tab("🖼️ Upload Job Screenshot"):
+                        job_image_input = gr.Image(
+                            label="Screenshot of Job Posting (PNG, JPG)",
+                            type="filepath",
+                        )
+                        gr.Markdown("💡 *Takes a screenshot from LinkedIn or job boards. EasyOCR extracts the requirements automatically.*")
 
-        # ── Right Column: Outputs ──
-        with gr.Column(scale=1):
-            gr.Markdown("### 📊 Recommendation & Gap Analysis Report")
-            report_output = gr.Markdown(
-                value="*Your detailed match report and recommendations will appear here after clicking **Analyze & Match**.*"
-            )
-            with gr.Accordion("🔍 View Extracted Structured Data (JSON)", open=False):
-                json_output = gr.JSON(label="Agent Raw Output")
+                with gr.Row():
+                    submit_btn = gr.Button("🚀 Analyze & Match", variant="primary", size="lg")
+                    clear_btn = gr.Button("🔄 Clear All", size="lg")
 
-    # Wire event handlers
-    submit_btn.click(
-        fn=run_pipeline,
-        inputs=[resume_file_input, resume_text_input, job_text_input, job_image_input],
-        outputs=[report_output, json_output],
-    )
+            # ── Right Column: Outputs ──
+            with gr.Column(scale=1):
+                gr.Markdown("### 📊 Recommendation & Gap Analysis Report")
+                report_output = gr.Markdown(
+                    value="*Your detailed match report and recommendations will appear here after clicking **Analyze & Match**.*"
+                )
+                with gr.Accordion("🔍 View Extracted Structured Data (JSON)", open=False):
+                    json_output = gr.JSON(label="Agent Raw Output")
 
-    def clear_all():
-        return None, "", "", None, "*Cleared. Ready for new analysis.*", {}
+        # Wire event handlers
+        submit_btn.click(
+            fn=run_pipeline,
+            inputs=[resume_file_input, resume_text_input, job_text_input, job_image_input],
+            outputs=[report_output, json_output],
+        )
 
-    clear_btn.click(
-        fn=clear_all,
-        inputs=[],
-        outputs=[resume_file_input, resume_text_input, job_text_input, job_image_input, report_output, json_output],
-    )
+        def clear_all():
+            return None, "", "", None, "*Cleared. Ready for new analysis.*", {}
+
+        clear_btn.click(
+            fn=clear_all,
+            inputs=[],
+            outputs=[resume_file_input, resume_text_input, job_text_input, job_image_input, report_output, json_output],
+        )
+except ImportError:
+    gr = None
+    demo = None
 
 
 # ── 10. FastAPI Application & Stitch Dashboard Server ────────────────────────
@@ -636,20 +666,46 @@ import webbrowser
 app = FastAPI(title="AI Resume Analyzer & Job Matching Agent")
 
 # Mount static files for Stitch assets (images, logos, styles)
-stitch_assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stitch_assets")
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+stitch_assets_dir = os.path.join(_base_dir, "stitch_assets")
+if not os.path.isdir(stitch_assets_dir):
+    stitch_assets_dir = os.path.join(os.getcwd(), "stitch_assets")
+if not os.path.isdir(stitch_assets_dir):
+    stitch_assets_dir = os.path.join(os.path.dirname(_base_dir), "stitch_assets")
+
 if os.path.isdir(stitch_assets_dir):
-    app.mount("/stitch_assets", StaticFiles(directory=stitch_assets_dir), name="stitch_assets")
+    try:
+        app.mount("/stitch_assets", StaticFiles(directory=stitch_assets_dir), name="stitch_assets")
+    except Exception as _sm_err:
+        print(f"Notice: static mount: {_sm_err}")
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint for Vercel and uptime monitors."""
+    return {
+        "status": "healthy",
+        "groq_configured": bool(os.environ.get("GROQ_API_KEY")),
+        "model": MODEL_NAME,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
     """Serves the AI Resume Match Agent Dashboard."""
-    dashboard_path = os.path.join(stitch_assets_dir, "dashboard_dualtone.html")
-    if not os.path.exists(dashboard_path):
-        return HTMLResponse("<h1>Error: dashboard template not found.</h1>", status_code=404)
-    with open(dashboard_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    candidate_paths = [
+        os.path.join(stitch_assets_dir, "dashboard_dualtone.html"),
+        os.path.join(os.getcwd(), "stitch_assets", "dashboard_dualtone.html"),
+        os.path.join(_base_dir, "stitch_assets", "dashboard_dualtone.html"),
+        os.path.join(os.path.dirname(_base_dir), "stitch_assets", "dashboard_dualtone.html"),
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Error: dashboard template not found.</h1>", status_code=404)
+
+
 
 
 @app.post("/api/analyze")
@@ -804,11 +860,12 @@ async def api_analyze(
         )
 
 
-# Mount Gradio interface under /gradio for backward compatibility
-try:
-    gr.mount_gradio_app(app, demo, path="/gradio")
-except Exception as _mount_err:
-    print(f"Notice: Gradio secondary mount warning: {_mount_err}")
+# Mount Gradio interface under /gradio for backward compatibility (if installed)
+if gr is not None and demo is not None:
+    try:
+        gr.mount_gradio_app(app, demo, path="/gradio")
+    except Exception as _mount_err:
+        print(f"Notice: Gradio secondary mount warning: {_mount_err}")
 
 
 def find_free_port(start_port: int = 7860, max_tries: int = 20) -> int:

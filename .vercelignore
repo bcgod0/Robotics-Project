@@ -1,0 +1,9 @@
+.git
+.gradio
+__pycache__
+*.pyc
+*.ipynb
+*.log
+.env
+.env.local
+.agents
