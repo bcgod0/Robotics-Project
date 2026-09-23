@@ -1,0 +1,344 @@
+[
+  {
+    "title": "Junior Data Analyst",
+    "company": "Northwind Analytics",
+    "required_skills": [
+      "SQL",
+      "Excel",
+      "Python",
+      "Data Visualization",
+      "Statistics"
+    ],
+    "description": "Analyze business data, build dashboards, and generate insights for stakeholders. Entry-level role, training provided on internal tools."
+  },
+  {
+    "title": "Machine Learning Intern",
+    "company": "Vertex AI Labs",
+    "required_skills": [
+      "Python",
+      "Machine Learning",
+      "NumPy",
+      "Pandas",
+      "Scikit-learn"
+    ],
+    "description": "Assist the ML team in building and evaluating models for recommendation systems. Exposure to production ML pipelines."
+  },
+  {
+    "title": "Frontend Developer (Junior)",
+    "company": "PixelForge",
+    "required_skills": [
+      "JavaScript",
+      "React",
+      "HTML",
+      "CSS",
+      "Git"
+    ],
+    "description": "Build responsive UI components for a SaaS product. Work closely with designers and backend engineers."
+  },
+  {
+    "title": "Backend Developer (Entry Level)",
+    "company": "CoreStack Systems",
+    "required_skills": [
+      "Python",
+      "REST APIs",
+      "SQL",
+      "Django",
+      "Git"
+    ],
+    "description": "Develop and maintain backend services and APIs for a growing fintech platform."
+  },
+  {
+    "title": "Business Intelligence Trainee",
+    "company": "Insight Metrics",
+    "required_skills": [
+      "SQL",
+      "Power BI",
+      "Excel",
+      "Data Modeling"
+    ],
+    "description": "Support the BI team in building reports and dashboards for leadership decision-making."
+  },
+  {
+    "title": "AI/ML Research Assistant",
+    "company": "Cognivance Research",
+    "required_skills": [
+      "Python",
+      "PyTorch",
+      "Deep Learning",
+      "Research Writing"
+    ],
+    "description": "Support ongoing NLP research projects, run experiments, and help prepare publications."
+  },
+  {
+    "title": "Cloud Support Engineer (Junior)",
+    "company": "SkyNet Cloud Services",
+    "required_skills": [
+      "AWS",
+      "Linux",
+      "Networking Basics",
+      "Python",
+      "Troubleshooting"
+    ],
+    "description": "Provide first-line support for cloud infrastructure customers and escalate complex issues."
+  },
+  {
+    "title": "QA/Automation Tester",
+    "company": "Bright Software Co",
+    "required_skills": [
+      "Selenium",
+      "Python",
+      "Test Case Design",
+      "Git",
+      "Agile"
+    ],
+    "description": "Write and execute automated test scripts to ensure product quality before releases."
+  },
+  {
+    "title": "RPA Developer (UiPath) - Fresher",
+    "company": "AutomateX",
+    "required_skills": [
+      "UiPath",
+      "RPA Concepts",
+      "C#",
+      ".NET Basics",
+      "Process Analysis"
+    ],
+    "description": "Design, build, and maintain RPA bots using UiPath to automate business workflows."
+  },
+  {
+    "title": "Data Engineering Intern",
+    "company": "PipelineWorks",
+    "required_skills": [
+      "Python",
+      "SQL",
+      "ETL",
+      "Airflow",
+      "Cloud Basics"
+    ],
+    "description": "Help build and maintain data pipelines feeding analytics and ML systems."
+  },
+  {
+    "title": "NLP Engineer (Junior)",
+    "company": "LexiSpeak AI",
+    "required_skills": [
+      "Python",
+      "NLP",
+      "Transformers",
+      "Hugging Face",
+      "Prompt Engineering"
+    ],
+    "description": "Build and fine-tune NLP models for a conversational AI product."
+  },
+  {
+    "title": "Full Stack Developer (Entry Level)",
+    "company": "AppNova",
+    "required_skills": [
+      "JavaScript",
+      "Node.js",
+      "React",
+      "MongoDB",
+      "REST APIs"
+    ],
+    "description": "Work across the stack to ship features for a fast-growing consumer app."
+  },
+  {
+    "title": "DevOps Intern",
+    "company": "InfraLoop",
+    "required_skills": [
+      "Docker",
+      "CI/CD",
+      "Linux",
+      "Git",
+      "Cloud Basics"
+    ],
+    "description": "Support deployment pipelines and infrastructure automation for engineering teams."
+  },
+  {
+    "title": "Product Analyst Intern",
+    "company": "Metricly",
+    "required_skills": [
+      "SQL",
+      "Excel",
+      "A/B Testing",
+      "Data Visualization"
+    ],
+    "description": "Analyze product usage data to support feature prioritization decisions."
+  },
+  {
+    "title": "Cybersecurity Analyst Trainee",
+    "company": "SentinelGuard",
+    "required_skills": [
+      "Networking",
+      "Linux",
+      "Security Fundamentals",
+      "Python"
+    ],
+    "description": "Monitor systems for security threats and assist in incident response under supervision."
+  },
+  {
+    "title": "Mobile App Developer (Android) - Junior",
+    "company": "AppSprout",
+    "required_skills": [
+      "Kotlin",
+      "Android SDK",
+      "Git",
+      "REST APIs"
+    ],
+    "description": "Develop and maintain features for a consumer Android application."
+  },
+  {
+    "title": "Computer Vision Intern",
+    "company": "VisionEdge AI",
+    "required_skills": [
+      "Python",
+      "OpenCV",
+      "Deep Learning",
+      "PyTorch"
+    ],
+    "description": "Work on object detection and image classification models for retail analytics."
+  },
+  {
+    "title": "Technical Support Engineer",
+    "company": "HelpDesk Pro",
+    "required_skills": [
+      "Troubleshooting",
+      "SQL Basics",
+      "Communication",
+      "Linux Basics"
+    ],
+    "description": "Resolve customer-reported technical issues and escalate as needed."
+  },
+  {
+    "title": "Automation Engineer (Python)",
+    "company": "ScriptWorks",
+    "required_skills": [
+      "Python",
+      "Automation Scripting",
+      "APIs",
+      "Git"
+    ],
+    "description": "Build internal automation tools to streamline repetitive business processes."
+  },
+  {
+    "title": "Data Science Intern",
+    "company": "Quantify Labs",
+    "required_skills": [
+      "Python",
+      "Pandas",
+      "Machine Learning",
+      "Statistics",
+      "Data Visualization"
+    ],
+    "description": "Work on real datasets to build predictive models and present findings to stakeholders."
+  },
+  {
+    "title": "UI/UX Designer (Junior)",
+    "company": "DesignHive",
+    "required_skills": [
+      "Figma",
+      "Wireframing",
+      "User Research",
+      "Prototyping"
+    ],
+    "description": "Design intuitive interfaces for web and mobile products in collaboration with developers."
+  },
+  {
+    "title": "IT Support Analyst",
+    "company": "GlobalTech Services",
+    "required_skills": [
+      "Windows Admin",
+      "Networking Basics",
+      "Troubleshooting",
+      "Ticketing Systems"
+    ],
+    "description": "Provide day-to-day IT support to internal employees across departments."
+  },
+  {
+    "title": "Generative AI Engineer (Junior)",
+    "company": "PromptForge AI",
+    "required_skills": [
+      "Python",
+      "Prompt Engineering",
+      "LLMs",
+      "RAG",
+      "LangChain"
+    ],
+    "description": "Build LLM-powered applications and agentic workflows for enterprise clients."
+  },
+  {
+    "title": "Database Administrator Trainee",
+    "company": "DataVault Inc",
+    "required_skills": [
+      "SQL",
+      "Database Design",
+      "Backup & Recovery",
+      "Linux Basics"
+    ],
+    "description": "Assist senior DBAs in maintaining and optimizing production databases."
+  },
+  {
+    "title": "Software Test Engineer",
+    "company": "QualityFirst Labs",
+    "required_skills": [
+      "Manual Testing",
+      "Selenium",
+      "Java",
+      "Bug Tracking"
+    ],
+    "description": "Ensure software quality through manual and automated testing cycles."
+  },
+  {
+    "title": "Data Annotation Specialist",
+    "company": "LabelWorks AI",
+    "required_skills": [
+      "Attention to Detail",
+      "Basic Python",
+      "Data Labeling Tools"
+    ],
+    "description": "Prepare and label datasets used to train machine learning models."
+  },
+  {
+    "title": "Blockchain Developer Intern",
+    "company": "ChainForge",
+    "required_skills": [
+      "Solidity",
+      "JavaScript",
+      "Web3.js",
+      "Smart Contracts"
+    ],
+    "description": "Assist in building and testing smart contracts for decentralized applications."
+  },
+  {
+    "title": "Growth/Marketing Analyst (Tech)",
+    "company": "ScaleUp Metrics",
+    "required_skills": [
+      "SQL",
+      "Excel",
+      "A/B Testing",
+      "Google Analytics"
+    ],
+    "description": "Analyze marketing funnel data to identify growth opportunities."
+  },
+  {
+    "title": "Embedded Systems Intern",
+    "company": "CircuitCore",
+    "required_skills": [
+      "C",
+      "Embedded C",
+      "Microcontrollers",
+      "Debugging"
+    ],
+    "description": "Support firmware development for IoT hardware products."
+  },
+  {
+    "title": "Junior Prompt Engineer",
+    "company": "DialogueWorks AI",
+    "required_skills": [
+      "Prompt Engineering",
+      "Python",
+      "LLMs",
+      "API Integration"
+    ],
+    "description": "Design and optimize prompts for production LLM-powered features."
+  }
+]
