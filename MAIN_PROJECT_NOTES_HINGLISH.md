@@ -565,7 +565,7 @@ async def serve_dashboard():
 
 ### `POST /api/analyze` — Main REST API Endpoint
 
-```python
+```python   
 @app.post("/api/analyze")
 async def api_analyze(
     resume_file: Optional[UploadFile] = File(None),
