@@ -25,22 +25,26 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-# Always load from .env first if present (for local runs)
-if os.path.exists(".env"):
-    try:
-        with open(".env", "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("GROQ_API_KEY="):
-                    val = line.split("=", 1)[1].strip().strip('"\'')
-                    if val and not os.environ.get("GROQ_API_KEY"):
-                        os.environ["GROQ_API_KEY"] = val
-                elif line.startswith("GROQ_MODEL="):
-                    val = line.split("=", 1)[1].strip().strip('"\'')
-                    if val and not os.environ.get("GROQ_MODEL"):
-                        os.environ["GROQ_MODEL"] = val
-    except Exception:
-        pass
+# Always load from .env first if present (for local runs) so new keys immediately take effect
+def reload_env_vars():
+    """Reload environment variables from .env to pick up newly added API keys."""
+    if os.path.exists(".env"):
+        try:
+            with open(".env", "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("GROQ_API_KEY="):
+                        val = line.split("=", 1)[1].strip().strip('"\'')
+                        if val:
+                            os.environ["GROQ_API_KEY"] = val
+                    elif line.startswith("GROQ_MODEL="):
+                        val = line.split("=", 1)[1].strip().strip('"\'')
+                        if val:
+                            os.environ["GROQ_MODEL"] = val
+        except Exception:
+            pass
+
+reload_env_vars()
 
 # Only prompt for API key if running interactively in terminal and no key is set
 if not os.environ.get("GROQ_API_KEY"):
@@ -61,16 +65,20 @@ from groq import Groq
 # Model choice — openai/gpt-oss-120b is available and tested on this Groq account.
 MODEL_NAME = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
+_current_api_key: Optional[str] = None
 _groq_client: Optional[Groq] = None
 
 
 def get_groq_client() -> Groq:
-    """Lazy initialize and return the Groq client instance."""
-    global _groq_client
+    """Lazy initialize and return the Groq client instance, auto-updating if the key changed."""
+    global _groq_client, _current_api_key
+    # Check .env on local machine in case user just pasted a new key
+    reload_env_vars()
     api_key = os.environ.get("GROQ_API_KEY", "").strip()
     if not api_key:
-        raise ValueError("GROQ_API_KEY environment variable is not set. Please add it to your Vercel Project Settings > Environment Variables.")
-    if _groq_client is None:
+        raise ValueError("GROQ_API_KEY environment variable is not set. Please add it in your Vercel Project Settings or in .env.")
+    if _groq_client is None or _current_api_key != api_key:
+        _current_api_key = api_key
         _groq_client = Groq(api_key=api_key)
     return _groq_client
 
